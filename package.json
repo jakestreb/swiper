@@ -1,0 +1,14 @@
+{
+  "name": "swiper",
+  "productName": "Swiper",
+  "version": "0.1.0-dev",
+  "description": "download helper",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "jake",
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "^3.1.1"
+  }
+}

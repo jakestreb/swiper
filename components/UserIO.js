@@ -1,5 +1,6 @@
+'use strict';
+
 const Promise = require('bluebird');
-const util = require('util');
 
 function UserIO() {
   // Currently, creating a UserIO object means monitoring stdin.
@@ -14,17 +15,21 @@ UserIO.prototype.startCLI = function() {
 UserIO.prototype.awaitInput = function(message) {
   return new Promise((resolve, reject) => {
     if (message) {
-      console.log(message);
+      this.send(message);
     }
     process.stdin.on('data', text => {
       if (text === 'quit\r\n' || text === 'exit\r\n') {
         process.exit();
       } else {
         // Resolve with the text minus /r/n
-        resolve(text.slice(0, -2));
+        resolve(text.trim());
       }
     });
   });
+};
+
+UserIO.prototype.send = function(message) {
+  console.log(message);
 };
 
 module.exports = UserIO;
