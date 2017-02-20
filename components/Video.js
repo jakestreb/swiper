@@ -6,6 +6,7 @@ function Video(title, type) {
   }
   this.title = title;
   this.type = type; // should be 'tv' or 'movie'.
+  this.torrent = null;
 }
 
 Video.prototype.getTitle = function() {
@@ -14,6 +15,14 @@ Video.prototype.getTitle = function() {
 
 Video.prototype.getType = function() {
   return this.type;
+};
+
+Video.prototype.setTorrent = function(torrent) {
+  this.torrent = torrent;
+};
+
+Video.prototype.isSubsetOf = function(video) {
+  return this.title === video.title;
 };
 
 // Should be extended.

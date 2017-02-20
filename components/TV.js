@@ -3,45 +3,51 @@
 const _ = require('underscore');
 const Video = require('./Video.js');
 
-function TV(title, season, episode) {
-  Video.call(this, title, 'tv');
+function Episode(title, season, episode) {
+  Video.call(this, title, 'episode');
   this.season = season;
   this.episode = episode;
 }
-_.extend(TV.prototype, Video.prototype);
+_.extend(Episode.prototype, Video.prototype);
 
-TV.prototype.getSearchTerm = function() {
+Episode.prototype.getSearchTerm = function() {
   return this.isEpisode() ? `${this.title.replace(/[^a-zA-Z ]/g, "")} ` +
     `s${this._padZeros(this.season)}e${this._padZeros(this.episode)}` : null;
 };
 
-TV.prototype.isEpisode = function() {
+Episode.prototype.isEpisode = function() {
   return this.season && this.episode;
 };
 
-TV.prototype.isSeason = function() {
+Episode.prototype.isSeason = function() {
   return this.season && !this.episode;
 };
 
-TV.prototype.isSeries = function() {
+Episode.prototype.isSeries = function() {
   return !this.season;
 };
 
-TV.prototype._padZeros = function(int) {
+Episode.prototype.isSubsetOf = function(tv) {
+  return this.title === tv.title &&
+    (!tv.season || (this.season === tv.season)) &&
+    (!tv.episode || (this.episode === tv.episode));
+};
+
+Episode.prototype._padZeros = function(int) {
   return ('00' + int).slice(-2);
 };
 
-TV.prototype.setSeason = function(season) {
+Episode.prototype.setSeason = function(season) {
   this.season = season;
 };
 
-TV.prototype.setEpisode = function(episode) {
+Episode.prototype.setEpisode = function(episode) {
   this.episode = episode;
 };
 
-TV.prototype.setSeasonEpisode = function(season, episode) {
+Episode.prototype.setSeasonEpisode = function(season, episode) {
   this.season = season;
   this.episode = episode;
 };
 
-module.exports = TV;
+module.exports = Episode;

@@ -9,6 +9,7 @@ function Torrent(stats) {
   this.leechers = stats.leechers;
   this.uploadDate = stats.uploadDate;
   this.magnetLink = stats.magnetLink;
+  this.isPaused = false;
   this.tfile = null;
 }
 
@@ -37,6 +38,25 @@ Torrent.prototype.getTier = function(type) {
   }
   let size = this.size >= settings.size[type].min && this.size <= settings.size[type].max;
   return size ? (qs - qIndex) + (qs * (this.seeders >= settings.minSeeders ? 1 : 0)) : 0;
+};
+
+Torrent.prototype.cancelDownload = function() {
+  this.tfile.destroy();
+};
+
+// Note: This only pauses connection to new peers.
+Torrent.prototype.pauseDownload = function() {
+  if (!this.isPaused) {
+    this.isPaused = true;
+    this.tfile.pause();
+  }
+};
+
+Torrent.prototype.resumeDownload = function() {
+  if (this.isPaused) {
+    this.isPaused = false;
+    this.tfile.resume();
+  }
 };
 
 Torrent.prototype.getDownloadInfo = function() {
