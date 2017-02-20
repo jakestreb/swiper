@@ -12,9 +12,8 @@ const commands = require('../util/commands.js');
 function Swiper() {
   this.userIO = new UserIO();
   this.torrentClient = new TorrentClient(() => {
-    this.send(`The torrent client just died. I'm restarting all the downloads ` +
-      `that were in progress.`);
-    // TODO: Restart all the downloads that were in progess.
+    this.send(`The torrent client just died. Restarting now.`);
+    // TODO: Restart all the downloads that were in progess, and tell the user.
   });
 
   this.downloading = [];
@@ -103,40 +102,86 @@ Swiper.prototype.getStatus = function() {
 };
 
 Swiper.prototype.monitor = function(input) {
-  return this._monitorVideo(this._identifyContentFromInput(input));
+  return this._monitorContent(this._identifyContentFromInput(input));
 };
 
-Swiper.prototype._monitorVideo = function(video) {
+Swiper.prototype._monitorContent = function(content) {
   return util.getMemory()
   .then(memory => {
-    let searchTerm = video.getSearchTerm();
-    if (!searchTerm) {
-      // TODO: Allow monitoring a season or series.
-      throw new Error('Not yet implemented.');
-    } else if (memory.monitored.find(m => m.isSubsetOf(video))) {
+    if (!content.isVideo()) {
+      return content.getCreatedAs() === 'series' ?
+        this._resolveMonitorSeries(content) : util.updateMemory('monitored', 'add', [content]);
+    } else if (memory.monitored.find(m => m.isSubsetOf(content))) {
       // The video is already being monitored.
       return `I'm already monitoring that.`;
     } else {
-      return util.updateMemory('monitored', 'add', [video]);
+      return util.updateMemory('monitored', 'add', [content]);
     }
   })
   .catch(() => {
-    this.send(`There was a problem adding ${video} to monitored.`);
+    this.send(`There was a problem adding ${content} to monitored.`);
+  });
+};
+
+Swiper.prototype._resolveMonitorSeries = function(series) {
+  return this.awaitResponse(`Type "series" to monitor the entire series, otherwise specify ` +
+    `the season, or also the episode, you'd like monitored. To monitor new episodes only, ` +
+    `type "new".`, [resp.series, resp.seasonOrEpisode, resp.new])
+  .then(feedback => {
+    if (feedback.match === 'series') {
+      // Series
+      series.trackNew(true);
+      return util.updateMemory('monitored', 'add', [series]);
+    } else if (feedback.match === 'episode') {
+      // Season or episode
+      let season = this._captureSeason(feedback.input);
+      let episode = this._captureEpisode(feedback.input);
+      if (!season) {
+        return this._resolveMonitorSeries(series);
+      } else if (season && !episode) {
+        // All season
+        series.filterToSeason(season);
+        return util.updateMemory('monitored', 'add', [series]);
+      } else {
+        // Season and episode
+        let ep = series.getEpisode(season, episode);
+        return util.updateMemory('monitored', 'add', [ep]);
+      }
+    } else {
+      // New
+      series.trackNew(true);
+      let now = new Date();
+      series.filterEpisodes(ep => ep.releaseDate > now);
+      return util.updateMemory('monitored', 'add', series);
+    }
   });
 };
 
 Swiper.prototype.download = function(input) {
   return this._identifyContentFromInput(input)
-  .then(video => {
-    let searchTerm = video.getSearchTerm();
-    if (!searchTerm) {
-      // TODO: Allow downloading a season or series.
-      throw new Error('Not yet implemented');
+  .then(content => {
+    if (!content.isVideo()) {
+      return this._downloadCollection(content);
     } else {
-      this.send(`Searching for ${video.getSearchTerm()}...`);
-      return Promise.join(video, util.torrentSearch(searchTerm));
+      this._resolveVideoDownload(content);
     }
-  })
+  });
+};
+
+Swiper.prototype._downloadCollection = function(collection) {
+  let onDeck = collection.episodes.slice(0, settings.concEps);
+  let onQueue = collection.episodes.slice(settings.concEps);
+  // Add most items to the queue.
+  util.updateMemory('queue', 'add', onQueue);
+  return Promise.reduce(onDeck, (acc, video) => {
+    return acc.then(() => this._resolveVideoDownload(video));
+  }, Promise.resolve());
+};
+
+Swiper.prototype._resolveVideoDownload = function(video) {
+  let searchTerm = video.getSearchTerm();
+  this.send(`Searching for ${searchTerm}...`);
+  return Promise.join(video, util.torrentSearch(searchTerm))
   .then((video, torrents) => {
     let best = this._autoPickTorrent(torrents, video.getType());
     if (!best) {
@@ -164,6 +209,7 @@ Swiper.prototype._startDownload = function(video) {
     this._removeFirst(this.downloading, video);
     this.completed.push(video);
     this.send(`${video.title} download complete!`);
+    this._tryDownloadNext(video);
   })
   .catch(() => {
     this.send(`${video.title} download process died, restarting download.`);
@@ -173,15 +219,43 @@ Swiper.prototype._startDownload = function(video) {
     `"status" to view progess. Is there anything else you need?`;
 };
 
+// Downloads the next queued download in a series after prevDownload.
+Swiper.prototype._tryDownloadNext = function(prevDownload) {
+  if (prevDownload.type() !== 'episode') {
+    return;
+  }
+  return util.getMemory()
+  .then(memory => {
+    let next = null;
+    memory.queue.forEach(content => {
+      if (content.title === prevDownload.title) {
+        if (content.type() === 'episode' && content.isEarlierThan(next)) {
+          next = content;
+        } else if (content.type() === 'collection') {
+          let possible = content.getNextEpisode(prevDownload.seasonNum, prevDownload.episodeNum);
+          if (possible.isEarlierThan(next)) {
+            next = possible;
+          }
+        }
+      }
+    });
+    if (!next) {
+      return;
+    }
+    return Promise.join(next, util.updateMemory('queue', 'remove', [next]));
+  })
+  .then(next => this._startDownload(next));
+};
+
 Swiper.prototype._resolveNoEligibleTorrents = function(video) {
   return this.awaitResponse(`I can't find a good torrent. If you'd like to see the ` +
     `results for yourself, type search, otherwise type monitor and I'll keep an eye ` +
     `out for ${video.getTitle()}`, [resp.search, resp.monitor])
   .then(resp => {
     if (resp.match === 'search') {
-      return this._searchSingleVideo(video);
+      return this._searchVideo(video);
     } else {
-      return this._monitorVideo(video);
+      return this._monitorContent(video);
     }
   });
 };
@@ -288,14 +362,14 @@ Swiper.prototype._getSubsets = function(arr, video) {
 
 Swiper.prototype.search = function(input) {
   return this._identifyContentFromInput(input)
-  .then(video => {
-    return Promise.resolve(video.getSearchTerm() ? video :
-      this._resolveSearchToEpisode(video));
+  .then(content => {
+    return Promise.resolve(content.isVideo() ? content :
+      this._resolveSearchToEpisode(content));
   })
-  .then(singleVideo => this._searchSingleVideo(singleVideo));
+  .then(video => this._searchVideo(video));
 };
 
-Swiper.prototype._searchSingleVideo = function(video) {
+Swiper.prototype._searchVideo = function(video) {
   return util.torrentSearch(video.getSearchTerm())
   .then(torrents => this._showTorrents(video, torrents));
 };
@@ -309,55 +383,55 @@ Swiper.prototype._identifyContentFromInput = function(input) {
   if (!videoData.title) {
     throw new InputError("I don't understand what the title is.");
   }
-  return util.identifyVideo(videoData)
-  .then(video => {
-    if (!video) {
+  return util.identifyContent(videoData)
+  .then(content => {
+    if (!content) {
       throw new InputError("I can't find anything with that title.");
     }
-    return video;
+    return content;
   });
 };
 
-Swiper.prototype._resolveSearchToEpisode = function(tv) {
-  let isSeries = tv.isSeries();
+Swiper.prototype._resolveSearchToEpisode = function(collection) {
+  let isSeries = collection.initialType() === 'series';
   let breadth = isSeries ? 'series' : 'season';
   return this.awaitResponse(`I can't search for a ${breadth} all at once. Specify the ` +
     `${isSeries ? "season and " : ""}episode to continue searching or type download ` +
-    `and I'll grab the whole ${breadth}.`,
+    `and I'll get the whole ${breadth}.`,
     [isSeries ? resp.seasonOrEpisode : resp.episode, resp.download]
   ).then(feedback => {
-    const seasonFinder = /\bs?(?:eason)? ?(\d{1,2})\b/gi;
     if (feedback.match === 'download') {
-      // TODO: Allow downloading an entire season or series.
+      this._downloadCollection(collection);
     } else if (isSeries) {
-      let [ season ] = this._execCapture(feedback.input, seasonFinder, 1);
+      let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
       if (!season) {
-        return this._resolveSearchToEpisode(tv);
+        return this._resolveSearchToEpisode(collection);
       } else if (!episode) {
-        tv.setSeason(season);
-        return this._resolveSeasonToEpisode(tv);
+        collection.filterToSeason(season);
+        return this._resolveSeasonToEpisode(collection);
       } else {
-        tv.setSeasonEpisode(season, episode);
-        return tv;
+        return collection.getEpisode(season, episode);
       }
     } else {
       let episode = this._captureEpisode(feedback.input);
       if (!episode) {
-        return this._resolveSeasonToEpisode(tv);
+        return this._resolveSeasonToEpisode(collection);
       } else {
-        tv.setEpisode(episode);
-        return tv;
+        return collection.getEpisode(collection.trackSeason, episode);
       }
     }
   });
 };
 
-Swiper.prototype._resolveSeasonToEpisode = function(tv) {
+Swiper.prototype._resolveSeasonToEpisode = function(season) {
   return this.awaitInput(`And the episode?`)
   .then(input => {
-    let episode = this._captureEpisode(input);
-    return episode || this._resolveSeasonToEpisode(tv);
+    let episodeNum = this._captureEpisode(input);
+    return episodeNum || this._resolveSeasonToEpisode(season);
+  })
+  .then(episodeNum => {
+    return season.getEpisode(season.trackSeason, episodeNum);
   });
 };
 
@@ -460,6 +534,12 @@ Swiper.prototype._removeFirst = function(arr, item) {
   if (index > -1) {
     arr.splice(index, 1);
   }
+};
+
+Swiper.prototype._captureSeason = function(str) {
+  const seasonFinder = /\bs?(?:eason)? ?(\d{1,2})\b/gi;
+  let [ season ] = this._execCapture(str, seasonFinder, 1);
+  return season;
 };
 
 Swiper.prototype._captureEpisode = function(str) {

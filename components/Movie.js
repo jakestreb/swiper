@@ -9,8 +9,20 @@ function Movie(title, year) {
 }
 _.extend(Movie.prototype, Video.prototype);
 
+Movie.prototype.getIntersection = function(content) {
+  return content.getType() === 'movie' && content.title === this.title ? this : null;
+};
+
 Movie.prototype.getSearchTerm = function() {
   return this.title.replace(/[^a-zA-Z ]/g, "") + " " + this.year;
+};
+
+Movie.prototype.getObject = function() {
+  return {
+    type: this.type,
+    title: this.title,
+    year: this.year,
+  };
 };
 
 module.exports = Movie;

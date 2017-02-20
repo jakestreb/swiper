@@ -1,13 +1,18 @@
 'use strict';
 
+const _ = require('underscore');
+const Content = require('./Content.js');
+
+// Should not be instantiated.
 function Video(title, type) {
+  Content.call(this, title, type);
   if (!title) {
     throw new Error('Video must have a title.');
   }
   this.title = title;
-  this.type = type; // should be 'tv' or 'movie'.
   this.torrent = null;
 }
+_.extend(Video.prototype, Content.prototype);
 
 Video.prototype.getTitle = function() {
   return this.title;
@@ -21,13 +26,20 @@ Video.prototype.setTorrent = function(torrent) {
   this.torrent = torrent;
 };
 
-Video.prototype.isSubsetOf = function(video) {
-  return this.title === video.title;
+Video.prototype.isVideo = function() {
+  return true;
 };
 
-// Should be extended.
+Video.prototype.getIntersection = function(video) {
+  throw new Error("Not implemented.");
+};
+
 Video.prototype.getSearchTerm = function() {
-  throw new Error("Not implemented");
+  throw new Error("Not implemented.");
+};
+
+Video.prototype.getObject = function() {
+  throw new Error("Not implemented.");
 };
 
 module.exports = Video;
