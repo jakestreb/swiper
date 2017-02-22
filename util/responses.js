@@ -54,3 +54,13 @@ exports.next = {
   value: 'next',
   regex: /\bn(ext)?\b/gi
 };
+
+exports.new = {
+  value: 'new',
+  regex: /\bnew\b/gi
+};
+
+exports.series = {
+  value: 'series',
+  regex: /\bseries\b/gi
+};

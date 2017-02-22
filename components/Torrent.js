@@ -82,7 +82,7 @@ Torrent.prototype.toString = function() {
 // Expects a string which starts with a decimal number and either GiB, MiB, or kiB
 function _getSizeMb(sizeStr) {
   try {
-    const factorMap = { 'g': 0.1, 'm': 1.0, 'k': 10.0 };
+    const factorMap = { 'g': 1000.0, 'm': 1.0, 'k': 0.001 };
     let [ valStr, units ] = sizeStr.split(/\s/g);
     let val = parseFloat(valStr);
     let factor = factorMap[units[0].toLowerCase()];

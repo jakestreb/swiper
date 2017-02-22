@@ -1,5 +1,7 @@
 'use strict';
 
+const sprintf = require('sprintf-js').sprintf;
+
 const UserIO = require('./UserIO.js');
 const TorrentClient = require('./TorrentClient.js');
 const InputError = require('./InputError.js');
@@ -9,6 +11,8 @@ const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
+// TODO: TPB torrent search returns 0 often, include auto re-search for search, download.
+// TODO: Handle lastDownload for a series/season download.
 function Swiper() {
   this.userIO = new UserIO();
   this.torrentClient = new TorrentClient(() => {
@@ -80,6 +84,9 @@ Swiper.prototype.parseCommand = function(input) {
   // Calls the function mapped to the command in COMMANDS with the content
   // following the command.
   let [req, rem] = this._splitFirst(input);
+  if (req.length === 0) {
+    return ' ';
+  }
   let func = commands[req].func;
   if (func) {
     return this[func](rem);
@@ -179,9 +186,8 @@ Swiper.prototype._downloadCollection = function(collection) {
 };
 
 Swiper.prototype._resolveVideoDownload = function(video) {
-  let searchTerm = video.getSearchTerm();
-  this.send(`Searching for ${searchTerm}...`);
-  return Promise.join(video, util.torrentSearch(searchTerm))
+  this.send(`Searching for ${video.title}...`);
+  return Promise.join(video, util.torrentSearch(video))
   .then((video, torrents) => {
     let best = this._autoPickTorrent(torrents, video.getType());
     if (!best) {
@@ -261,12 +267,12 @@ Swiper.prototype._resolveNoEligibleTorrents = function(video) {
 };
 
 Swiper.prototype.getCommands = function() {
-  let output = "";
+  let output = "\n";
   for (let cmd in commands) {
     let cmdInfo = commands[cmd];
     if (!cmdInfo.isAlias) {
-      let aliases = cmdInfo.aliases || [];
-      output += `${cmd}: Also ${aliases.join(' or ')}. commands[cmd].desc}\n\n`;
+      let tabLen = 12 - cmd.length;
+      output += `${cmd}:${' '.repeat(tabLen)}${commands[cmd].desc}\n`;
     }
   }
   return output;
@@ -462,7 +468,7 @@ Swiper.prototype._showTorrents = function(video, torrents, type) {
 
 Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex) {
   let n = settings.displayTorrents;
-  let activeTorrents = torrents.slice(startIndex, n);
+  let activeTorrents = torrents.slice(startIndex, startIndex + n);
   let responses = [resp.download], prev = false, next = false;
   if (startIndex > 0) {
     prev = true;
@@ -472,27 +478,28 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
     next = true;
     responses.push(resp.next);
   }
+  // TODO: Handle activeTorrents.length === 0 (No torrents found)
   return this.awaitResponse(`Found torrents:\n` +
     `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1}.` + t.toString(), "")}` +
-    `Type ${prev ? '"prev", ' : ""}${next ? '"next", ' : ""}or "download" followed` +
+    `Type ${prev ? '"prev", ' : ""}${next ? '"next", ' : ""}or "download" followed ` +
     `by the number of the torrent you'd like.`, responses)
   .then(resp => {
     switch (resp.match) {
       case 'prev':
-        return this._showSomeTorrents(torrents, type, startIndex - n);
+        return this._showSomeTorrents(video, torrents, type, startIndex - n);
       case 'next':
-        return this._showSomeTorrents(torrents, type, startIndex + n);
+        return this._showSomeTorrents(video, torrents, type, startIndex + n);
       case 'download':
         let [ numStr ] = this._execCapture(resp.input, /\bd(?:ownload)?\s*(\d)/, 1);
         if (!numStr) {
-          return this._showSomeTorrents(torrents, type, startIndex);
+          return this._showSomeTorrents(video, torrents, type, startIndex);
         }
         let num = parseInt(numStr, 10);
         if (num > 0 && num <= torrents.length) {
           video.setTorrent(torrents[num - 1]);
           return this._startDownload(video);
         } else {
-          return this._showSomeTorrents(torrents, type, startIndex);
+          return this._showSomeTorrents(video, torrents, type, startIndex);
         }
     }
   });
