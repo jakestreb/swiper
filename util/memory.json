@@ -1,4 +1,3 @@
-// Remembers monitored and queued shows in case the server process dies.
 {
   "monitored": [],
   "queued": []

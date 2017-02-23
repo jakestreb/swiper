@@ -1,35 +1,16 @@
 'use strict';
 
-const Promise = require('bluebird');
-
 function UserIO() {
-  // Currently, creating a UserIO object means monitoring stdin.
-  this.startCLI();
+
 }
 
-UserIO.prototype.startCLI = function() {
-  process.stdin.resume();
-  process.stdin.setEncoding('utf8');
-};
-
+// Returns a promise resolved with user input.
 UserIO.prototype.awaitInput = function(message) {
-  return new Promise((resolve, reject) => {
-    if (message) {
-      this.send(message);
-    }
-    process.stdin.on('data', text => {
-      if (text === 'quit\r\n' || text === 'exit\r\n') {
-        process.exit();
-      } else {
-        // Resolve with the text minus /r/n
-        resolve(text.trim());
-      }
-    });
-  });
+  throw new Error('Not implemented.');
 };
 
 UserIO.prototype.send = function(message) {
-  console.log(message);
+  throw new Error('Not implemented.');
 };
 
 module.exports = UserIO;

@@ -1,27 +1,21 @@
 'use strict';
 
-const sprintf = require('sprintf-js').sprintf;
-
-const UserIO = require('./UserIO.js');
-const TorrentClient = require('./TorrentClient.js');
 const InputError = require('./InputError.js');
-
 const resp = require('../util/responses.js');
 const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
-// TODO: TPB torrent search returns 0 often, include auto re-search for search, download.
 // TODO: Handle lastDownload for a series/season download.
-function Swiper() {
-  this.userIO = new UserIO();
-  this.torrentClient = new TorrentClient(() => {
-    this.send(`The torrent client just died. Restarting now.`);
-    // TODO: Restart all the downloads that were in progess, and tell the user.
-  });
+function Swiper(dispatcher, userIO, id) {
+  this.dispatcher = dispatcher;
+  this.userIO = userIO;
+  this.id = id;
 
-  this.downloading = [];
-  this.completed = [];
+  this.torrentClient = dispatcher.torrentClient;
+  this.downloading = dispatcher.downloading;
+  this.completed = dispatcher.completed;
+
   this.lastDownload = null;
 
   this.awaitCommand('Hello.');
@@ -84,45 +78,46 @@ Swiper.prototype.parseCommand = function(input) {
   // Calls the function mapped to the command in COMMANDS with the content
   // following the command.
   let [req, rem] = this._splitFirst(input);
-  if (req.length === 0) {
-    return ' ';
-  }
-  let func = commands[req].func;
-  if (func) {
-    return this[func](rem);
+  let cmd = commands[req];
+  if (cmd && cmd.func) {
+    return this[cmd.func](rem);
   } else {
     throw new InputError('Not recognized. Type "help" for supported commands.');
   }
 };
 
 Swiper.prototype.getStatus = function() {
-  return util.getMemory(memory => {
-    return "Monitoring:\n" +
-      memory.monitored + "\n\n" +
+  return this.dispatcher.readMemory()
+  .then(memory => {
+    return "\nMonitoring:\n" +
+      (memory.monitored.join("\n") || "None") + "\n\n" +
       "Queued:\n" +
-      memory.queued + "\n\n" +
+      (memory.queued.join("\n") || "None") + "\n\n" +
       "Downloading:\n" +
-      this.downloading.reduce((acc, val) => acc + val.getDownloadInfo(), "") + "\n\n" +
+      (this.downloading.reduce((acc, val) =>
+        acc + val.torrent.getDownloadInfo() + "\n", "") || "None\n") + "\n" +
       "Completed:\n" +
-      this.completed.reduce((acc, val) => acc + val.getName());
+      (this.completed.reduce((acc, val) => acc + val.getName() + "\n", "") || "None\n");
   });
 };
 
 Swiper.prototype.monitor = function(input) {
-  return this._monitorContent(this._identifyContentFromInput(input));
+  return this._identifyContentFromInput(input).then(content =>
+    this._monitorContent(content)
+  );
 };
 
 Swiper.prototype._monitorContent = function(content) {
-  return util.getMemory()
+  return this.dispatcher.readMemory()
   .then(memory => {
     if (!content.isVideo()) {
-      return content.getCreatedAs() === 'series' ?
-        this._resolveMonitorSeries(content) : util.updateMemory('monitored', 'add', [content]);
+      return content.getCreatedAs() === 'series' ? this._resolveMonitorSeries(content) :
+        this.dispatcher.updateMemory('monitored', 'add', [content]);
     } else if (memory.monitored.find(m => m.isSubsetOf(content))) {
       // The video is already being monitored.
       return `I'm already monitoring that.`;
     } else {
-      return util.updateMemory('monitored', 'add', [content]);
+      return this.dispatcher.updateMemory('monitored', 'add', [content]);
     }
   })
   .catch(() => {
@@ -138,7 +133,7 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
     if (feedback.match === 'series') {
       // Series
       series.trackNew(true);
-      return util.updateMemory('monitored', 'add', [series]);
+      return this.dispatcher.updateMemory('monitored', 'add', [series]);
     } else if (feedback.match === 'episode') {
       // Season or episode
       let season = this._captureSeason(feedback.input);
@@ -148,18 +143,18 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
       } else if (season && !episode) {
         // All season
         series.filterToSeason(season);
-        return util.updateMemory('monitored', 'add', [series]);
+        return this.dispatcher.updateMemory('monitored', 'add', [series]);
       } else {
         // Season and episode
         let ep = series.getEpisode(season, episode);
-        return util.updateMemory('monitored', 'add', [ep]);
+        return this.dispatcher.updateMemory('monitored', 'add', [ep]);
       }
     } else {
       // New
       series.trackNew(true);
       let now = new Date();
       series.filterEpisodes(ep => ep.releaseDate > now);
-      return util.updateMemory('monitored', 'add', series);
+      return this.dispatcher.updateMemory('monitored', 'add', series);
     }
   });
 };
@@ -179,7 +174,7 @@ Swiper.prototype._downloadCollection = function(collection) {
   let onDeck = collection.episodes.slice(0, settings.concEps);
   let onQueue = collection.episodes.slice(settings.concEps);
   // Add most items to the queue.
-  util.updateMemory('queue', 'add', onQueue);
+  this.dispatcher.updateMemory('queue', 'add', onQueue);
   return Promise.reduce(onDeck, (acc, video) => {
     return acc.then(() => this._resolveVideoDownload(video));
   }, Promise.resolve());
@@ -230,7 +225,7 @@ Swiper.prototype._tryDownloadNext = function(prevDownload) {
   if (prevDownload.type() !== 'episode') {
     return;
   }
-  return util.getMemory()
+  return this.dispatcher.readMemory()
   .then(memory => {
     let next = null;
     memory.queue.forEach(content => {
@@ -248,7 +243,7 @@ Swiper.prototype._tryDownloadNext = function(prevDownload) {
     if (!next) {
       return;
     }
-    return Promise.join(next, util.updateMemory('queue', 'remove', [next]));
+    return Promise.join(next, this.dispatcher.updateMemory('queue', 'remove', [next]));
   })
   .then(next => this._startDownload(next));
 };
@@ -288,12 +283,14 @@ Swiper.prototype.abort = function() {
 };
 
 Swiper.prototype.remove = function(input) {
-  return this._removeVideo(this._identifyContentFromInput(input));
+  this._identifyContentFromInput(input).then(content =>
+    this._removeVideo(content)
+  );
 };
 
 Swiper.prototype._removeVideo = function(video, hidePrompts) {
   let prompts = [];
-  return util.getMemory()
+  return this.dispatcher.readMemory()
   .then(memory => {
     // Note that video here may refer to an entire season or series.
     // Handle monitored and queued.
@@ -304,7 +301,7 @@ Swiper.prototype._removeVideo = function(video, hidePrompts) {
       if (n > 0) {
         prompts.push(this._confirmAction.bind(this, `Remove ` +
           `${n > 1 ? `${n} instances of ${video.title}` : video.title} from ${name}?`,
-          () => { util.updateMemory(name, 'remove', memRemovals); }, hidePrompts));
+          () => { this.dispatcher.updateMemory(name, 'remove', memRemovals); }, hidePrompts));
       }
     }
     // Handle downloading.
@@ -376,8 +373,21 @@ Swiper.prototype.search = function(input) {
 };
 
 Swiper.prototype._searchVideo = function(video) {
-  return util.torrentSearch(video.getSearchTerm())
-  .then(torrents => this._showTorrents(video, torrents));
+  return util.torrentSearch(video.getSearchTerm(), 2)
+  .then(torrents => {
+    if (torrents.length > 0) {
+      return this._showTorrents(video, torrents);
+    } else {
+      return this.awaitResponse("I can't seem to find that right now. Would you like me to " +
+        "keep an eye out for it?", [resp.yes, resp.no])
+      .then(feedback => {
+        if (feedback.match === 'yes') {
+          this._monitorContent(video);
+        }
+        return "Ok";
+      });
+    }
+  });
 };
 
 // Helper for handling initial input to search and download.
@@ -447,13 +457,13 @@ Swiper.prototype._parseTitle = function(titleStr) {
   const yearFinder = /\b\d{4}\b/gi;
   const epFinder = /\bs(?:eason)? ?(\d{1,2}) ?(?:ep?(?:isode)? ?(\d{1,2}))?\b/gi;
 
-  let [ title ] = this._execCapture(titleStr, titleFinder, 1);
+  let [title] = this._execCapture(titleStr, titleFinder, 1);
   if (!title) {
     return {};
   }
   let rem = this._removePrefix(titleStr, title);
-  let [ year ] = this._execCapture(rem, yearFinder, 1);
-  let [ season, episode ] = this._execCapture(rem, epFinder, 2);
+  let [year] = this._execCapture(rem, yearFinder, 1);
+  let [season, episode] = this._execCapture(rem, epFinder, 2);
   return {
     title: title,
     year: year,
@@ -478,23 +488,23 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
     next = true;
     responses.push(resp.next);
   }
-  // TODO: Handle activeTorrents.length === 0 (No torrents found)
   return this.awaitResponse(`Found torrents:\n` +
     `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1}.` + t.toString(), "")}` +
     `Type ${prev ? '"prev", ' : ""}${next ? '"next", ' : ""}or "download" followed ` +
     `by the number of the torrent you'd like.`, responses)
   .then(resp => {
+    let numStr, num;
     switch (resp.match) {
       case 'prev':
         return this._showSomeTorrents(video, torrents, type, startIndex - n);
       case 'next':
         return this._showSomeTorrents(video, torrents, type, startIndex + n);
       case 'download':
-        let [ numStr ] = this._execCapture(resp.input, /\bd(?:ownload)?\s*(\d)/, 1);
+        [numStr] = this._execCapture(resp.input, /\bd(?:ownload)?\s*(\d)/, 1);
         if (!numStr) {
           return this._showSomeTorrents(video, torrents, type, startIndex);
         }
-        let num = parseInt(numStr, 10);
+        num = parseInt(numStr, 10);
         if (num > 0 && num <= torrents.length) {
           video.setTorrent(torrents[num - 1]);
           return this._startDownload(video);
@@ -545,13 +555,13 @@ Swiper.prototype._removeFirst = function(arr, item) {
 
 Swiper.prototype._captureSeason = function(str) {
   const seasonFinder = /\bs?(?:eason)? ?(\d{1,2})\b/gi;
-  let [ season ] = this._execCapture(str, seasonFinder, 1);
+  let [season] = this._execCapture(str, seasonFinder, 1);
   return season;
 };
 
 Swiper.prototype._captureEpisode = function(str) {
   const epFinder = /\bep?(?:isode)? ?(\d{1,2})\b/gi;
-  let [ ep ] = this._execCapture(str, epFinder, 1);
+  let [ep] = this._execCapture(str, epFinder, 1);
   return ep;
 };
 
