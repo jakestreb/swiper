@@ -1,12 +1,15 @@
 'use strict';
 
+const Promise = require('bluebird');
+const isOnline = require('is-online');
 const InputError = require('./InputError.js');
 const resp = require('../util/responses.js');
 const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
-// TODO: Handle lastDownload for a series/season download.
+// TODO: Restart on all exceptions.
+// TODO: Export completed downloads.
 function Swiper(dispatcher, userIO, id) {
   this.dispatcher = dispatcher;
   this.userIO = userIO;
@@ -17,6 +20,7 @@ function Swiper(dispatcher, userIO, id) {
   this.completed = dispatcher.completed;
 
   this.lastDownload = null;
+  this.downloadCount = 0;
 
   this.awaitCommand('Hello.');
 }
@@ -26,7 +30,7 @@ Swiper.prototype.send = function(message) {
 };
 
 Swiper.prototype.awaitInput = function(message) {
-  return this.userIO.awaitInput(message)
+  return Promise.try(() => this.userIO.awaitInput(message))
   .then(input => input === 'cancel' ?
     this.awaitCommand('Ok, nevermind. Need anything else?') : input
   );
@@ -90,39 +94,29 @@ Swiper.prototype.getStatus = function() {
   return this.dispatcher.readMemory()
   .then(memory => {
     return "\nMonitoring:\n" +
-      (memory.monitored.join("\n") || "None") + "\n\n" +
+      (memory.monitored.map(item => item.getDesc()).join("\n") || "None") + "\n\n" +
       "Queued:\n" +
-      (memory.queued.join("\n") || "None") + "\n\n" +
+      (memory.queued.map(item => item.getDesc()).join("\n") || "None") + "\n\n" +
       "Downloading:\n" +
       (this.downloading.reduce((acc, val) =>
         acc + val.torrent.getDownloadInfo() + "\n", "") || "None\n") + "\n" +
       "Completed:\n" +
-      (this.completed.reduce((acc, val) => acc + val.getName() + "\n", "") || "None\n");
+      (this.completed.reduce((acc, val) => acc + val.getDesc() + "\n", "") || "None\n");
   });
 };
 
 Swiper.prototype.monitor = function(input) {
-  return this._identifyContentFromInput(input).then(content =>
-    this._monitorContent(content)
-  );
+  return this._identifyContentFromInput(input)
+  .then(content => this._monitorContent(content));
 };
 
 Swiper.prototype._monitorContent = function(content) {
-  return this.dispatcher.readMemory()
-  .then(memory => {
-    if (!content.isVideo()) {
-      return content.getCreatedAs() === 'series' ? this._resolveMonitorSeries(content) :
-        this.dispatcher.updateMemory('monitored', 'add', [content]);
-    } else if (memory.monitored.find(m => m.isSubsetOf(content))) {
-      // The video is already being monitored.
-      return `I'm already monitoring that.`;
-    } else {
-      return this.dispatcher.updateMemory('monitored', 'add', [content]);
-    }
-  })
-  .catch(() => {
-    this.send(`There was a problem adding ${content} to monitored.`);
-  });
+  if (!content.isVideo()) {
+    return content.getInitialType() === 'series' ? this._resolveMonitorSeries(content) :
+      this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
+  } else {
+    return this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
+  }
 };
 
 Swiper.prototype._resolveMonitorSeries = function(series) {
@@ -132,8 +126,7 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
   .then(feedback => {
     if (feedback.match === 'series') {
       // Series
-      series.trackNew(true);
-      return this.dispatcher.updateMemory('monitored', 'add', [series]);
+      return this.dispatcher.updateMemory(this.id, 'monitored', 'add', series);
     } else if (feedback.match === 'episode') {
       // Season or episode
       let season = this._captureSeason(feedback.input);
@@ -143,120 +136,122 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
       } else if (season && !episode) {
         // All season
         series.filterToSeason(season);
-        return this.dispatcher.updateMemory('monitored', 'add', [series]);
+        return this.dispatcher.updateMemory(this.id, 'monitored', 'add', series);
       } else {
         // Season and episode
         let ep = series.getEpisode(season, episode);
-        return this.dispatcher.updateMemory('monitored', 'add', [ep]);
+        return this.dispatcher.updateMemory(this.id, 'monitored', 'add', ep);
       }
     } else {
       // New
-      series.trackNew(true);
       let now = new Date();
       series.filterEpisodes(ep => ep.releaseDate > now);
-      return this.dispatcher.updateMemory('monitored', 'add', series);
+      return this.dispatcher.updateMemory(this.id, 'monitored', 'add', series);
     }
   });
 };
 
 Swiper.prototype.download = function(input) {
-  return this._identifyContentFromInput(input)
-  .then(content => {
-    if (!content.isVideo()) {
-      return this._downloadCollection(content);
+  return isOnline().then(online => {
+    if (!online) {
+      return `I don't have a good connection right now. Try again in a few minutes.`;
     } else {
-      this._resolveVideoDownload(content);
+      return this._identifyContentFromInput(input)
+      .then(content => content.isVideo() ? this._resolveVideoDownload(content) :
+        this.queueDownload(content));
     }
   });
 };
 
-Swiper.prototype._downloadCollection = function(collection) {
-  let onDeck = collection.episodes.slice(0, settings.concEps);
-  let onQueue = collection.episodes.slice(settings.concEps);
-  // Add most items to the queue.
-  this.dispatcher.updateMemory('queue', 'add', onQueue);
-  return Promise.reduce(onDeck, (acc, video) => {
-    return acc.then(() => this._resolveVideoDownload(video));
-  }, Promise.resolve());
-};
-
-Swiper.prototype._resolveVideoDownload = function(video) {
-  this.send(`Searching for ${video.title}...`);
-  return Promise.join(video, util.torrentSearch(video))
-  .then((video, torrents) => {
+// If noPrompt is set, no prompts will be offered to the user.
+Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
+  this.send(`Searching for ${video.getTitle()}...`);
+  return util.torrentSearch(video, 2)
+  .then(torrents => {
     let best = this._autoPickTorrent(torrents, video.getType());
     if (!best) {
-      return this._resolveNoEligibleTorrents(video);
+      return noPrompt || this.awaitResponse(`I can't find a good torrent. If you'd like to see ` +
+        `the results for yourself, type "search", otherwise type "monitor" and I'll keep an eye ` +
+        `out for ${video.getTitle()}`, [resp.search, resp.monitor])
+        .then(resp => {
+          return resp.match === 'search' ? this._searchVideo(video) :
+            this._monitorContent(video);
+        });
     } else {
       video.setTorrent(best);
-      return this._startDownload(video);
+      return this.queueDownload(video);
     }
+  });
+};
+
+// This should always be called to download content. Adds a video to the queue
+// or starts the download if max concurrent downloads is not met.
+// If noPrompt is set, no prompts will be offered to the user.
+Swiper.prototype.queueDownload = function(content) {
+  let addCount = settings.maxDownloads - this.downloadCount;
+  let ready = [];
+  let queueItem = null;
+  if (content.getType() === 'collection') {
+    ready = content.popArray(addCount);
+    queueItem = content.isEmpty() ? null : content;
+  } else if (addCount > 0) {
+    ready = [content];
+  } else if (addCount === 0) {
+    queueItem = content;
+  }
+  Promise.try(() => queueItem ?
+    this.dispatcher.updateMemory(this.id, 'queue', 'add', queueItem) : null)
+  .then(() => {
+    return ready.reduce((acc, video) => {
+      return acc.then(() => this._startDownload(video));
+    }, Promise.resolve());
   });
 };
 
 Swiper.prototype._startDownload = function(video) {
   this.lastDownload = video;
   // Clear the lastDownload in 60s so that it can no longer be aborted.
-  setTimeout(60000, () => {
+  Promise.delay(60000)
+  .then(() => {
     if (this.lastDownload === video) {
       this.lastDownload = null;
     }
   });
   // Remove the video from monitoring and queueing, if it was in those places.
-  this._removeVideo(video, true);
+  this._removeVideo(video, true, true);
   this.downloading.push(video);
+  this.downloadCount++;
   this.torrentClient.download(video.torrent)
   .then(() => {
     this._removeFirst(this.downloading, video);
     this.completed.push(video);
-    this.send(`${video.title} download complete!`);
-    this._tryDownloadNext(video);
+    this.downloadCount--;
+    return util.exportVideo(video);
   })
-  .catch(() => {
-    this.send(`${video.title} download process died, restarting download.`);
-    this._startDownload(video);
+  .then(() => {
+    this.send(`${video.getTitle()} download complete!`);
+    // Try to download the next item in this swiper's queue.
+    if (this.downloadCount < settings.maxDownload) {
+      this._downloadFromQueue();
+    }
   });
+  // TODO: Uncomment
+  // .catch(() => {
+  //   this.send(`${video.title} download process died, restarting download.`);
+  //   this._startDownload(video);
+  // });
   return `Downloading: \n${video.torrent.toString()}\nType "abort" to stop the download, or ` +
     `"status" to view progess. Is there anything else you need?`;
 };
 
-// Downloads the next queued download in a series after prevDownload.
-Swiper.prototype._tryDownloadNext = function(prevDownload) {
-  if (prevDownload.type() !== 'episode') {
-    return;
-  }
+Swiper.prototype._downloadFromQueue = function() {
   return this.dispatcher.readMemory()
   .then(memory => {
-    let next = null;
-    memory.queue.forEach(content => {
-      if (content.title === prevDownload.title) {
-        if (content.type() === 'episode' && content.isEarlierThan(next)) {
-          next = content;
-        } else if (content.type() === 'collection') {
-          let possible = content.getNextEpisode(prevDownload.seasonNum, prevDownload.episodeNum);
-          if (possible.isEarlierThan(next)) {
-            next = possible;
-          }
-        }
-      }
-    });
-    if (!next) {
-      return;
-    }
-    return Promise.join(next, this.dispatcher.updateMemory('queue', 'remove', [next]));
-  })
-  .then(next => this._startDownload(next));
-};
-
-Swiper.prototype._resolveNoEligibleTorrents = function(video) {
-  return this.awaitResponse(`I can't find a good torrent. If you'd like to see the ` +
-    `results for yourself, type search, otherwise type monitor and I'll keep an eye ` +
-    `out for ${video.getTitle()}`, [resp.search, resp.monitor])
-  .then(resp => {
-    if (resp.match === 'search') {
-      return this._searchVideo(video);
-    } else {
-      return this._monitorContent(video);
+    let myQueue = memory.queue.filter(item => item.swiperId === this.id);
+    let next = myQueue.shift();
+    if (next) {
+      return this.dispatcher.updateQueue(this.id, 'queue', 'remove', next)
+      .then(() => this.queueDownload(next));
     }
   });
 };
@@ -270,6 +265,8 @@ Swiper.prototype.getCommands = function() {
       output += `${cmd}:${' '.repeat(tabLen)}${commands[cmd].desc}\n`;
     }
   }
+  output += `\nIf you're getting an incorrect match, try adding the release ` +
+    `year after the title.\n`;
   return output;
 };
 
@@ -283,12 +280,11 @@ Swiper.prototype.abort = function() {
 };
 
 Swiper.prototype.remove = function(input) {
-  this._identifyContentFromInput(input).then(content =>
-    this._removeVideo(content)
-  );
+  return this._identifyContentFromInput(input)
+  .then(content => this._removeVideo(content));
 };
 
-Swiper.prototype._removeVideo = function(video, hidePrompts) {
+Swiper.prototype._removeVideo = function(video, ignoreDownloading, hidePrompts) {
   let prompts = [];
   return this.dispatcher.readMemory()
   .then(memory => {
@@ -296,36 +292,38 @@ Swiper.prototype._removeVideo = function(video, hidePrompts) {
     // Handle monitored and queued.
     for (let name in memory) {
       let queue = memory[name];
-      let memRemovals = this._getSubsets(queue, video);
-      let n = memRemovals.length;
-      if (n > 0) {
-        prompts.push(this._confirmAction.bind(this, `Remove ` +
-          `${n > 1 ? `${n} instances of ${video.title}` : video.title} from ${name}?`,
-          () => { this.dispatcher.updateMemory(name, 'remove', memRemovals); }, hidePrompts));
+      let memIsCandidate = queue.find(item => item.containsAny(video));
+      if (memIsCandidate) {
+        prompts.push(this._confirmAction.bind(this, `Remove ${video.getTitle()} from ${name}?`,
+          () => this.dispatcher.updateMemory(this.id, name, 'remove', video), hidePrompts));
       }
     }
     // Handle downloading.
-    let dwnRemovals = this._getSubsets(this.downloading, video);
-    let n = dwnRemovals.length;
-    if (n > 0) {
-      prompts.push(this._confirmAction.bind(this, `Abort downloading ` +
-        `${n > 1 ? `${n} instances of ${video.title}` : video.title}?`,
-        () => { dwnRemovals.forEach(item => { this._cancelDownload(item); }); }, hidePrompts));
+    if (!ignoreDownloading) {
+      let dwnCancel = this.downloading.find(item => item.equals(video));
+      if (dwnCancel) {
+        prompts.push(this._confirmAction.bind(this, `Abort downloading ${video.getTitle()}?`,
+          () => this._cancelDownload(dwnCancel), hidePrompts));
+      }
     }
     // Display the prompts one after the other.
-    return Promise.reduce(prompts, (acc, prompt) => {
-      return acc.then(() => prompt());
-    }, Promise.resolve());
+    if (prompts.length > 0) {
+      return prompts.reduce((acc, prompt) => {
+        return acc.then(() => prompt());
+      }, Promise.resolve());
+    } else {
+      return `${video.getTitle()} is not being monitored, queued or downloaded.`;
+    }
   });
 };
 
 // Create a yes/no prompt with the option to override the prompt with an immediate 'yes'.
 Swiper.prototype._confirmAction = function(promptText, callback, optYes) {
   return Promise.resolve(optYes ? { match: 'yes' } :
-    this.awaitRespose(promptText, [resp.yes, resp.no]))
+    this.awaitResponse(promptText, [resp.yes, resp.no]))
   .then(resp => {
     if (resp.match === 'yes') {
-      callback();
+      return callback();
     }
   });
 };
@@ -348,32 +346,28 @@ Swiper.prototype._pauseOrResume = function(input, isPause) {
   let action = isPause ? 'Pause' : 'Resume';
   return this._identifyContentFromInput(input)
   .then(video => {
-    let relevant = this._getSubsets(this.downloading, video);
-    return this._confirmAction(`${action} ${relevant.length} relevant downloads?`,
-      () => { relevant.forEach(item => {
-        isPause ? item.torrent.pauseDownload() : item.torrent.resumeDownload();
-      }); },
-      relevant.length === 1
+    let relevant = this.downloading.find(item => item.equals(video));
+    return this._confirmAction(`${action} ${relevant.getTitle()}?`,
+      () => { isPause ? relevant.torrent.pauseDownload() : relevant.torrent.resumeDownload(); }
     ).then(() => '${action}d.');
   });
 };
 
-// Returns a filtered version of the array containing only items which are subsets of video.
-Swiper.prototype._getSubsets = function(arr, video) {
-  return arr.filter(item => item.isSubsetOf(video));
-};
-
 Swiper.prototype.search = function(input) {
-  return this._identifyContentFromInput(input)
-  .then(content => {
-    return Promise.resolve(content.isVideo() ? content :
-      this._resolveSearchToEpisode(content));
-  })
-  .then(video => this._searchVideo(video));
+  return isOnline().then(online => {
+    if (!online) {
+      return `I don't have a good connection right now. Try again in a few minutes.`;
+    } else {
+      return this._identifyContentFromInput(input)
+      .then(content => content.isVideo() ? content : this._resolveSearchToEpisode(content))
+      .then(video => this._searchVideo(video));
+    }
+  });
 };
 
 Swiper.prototype._searchVideo = function(video) {
-  return util.torrentSearch(video.getSearchTerm(), 2)
+  console.warn('searchVid', video);
+  return util.torrentSearch(video, 2)
   .then(torrents => {
     if (torrents.length > 0) {
       return this._showTorrents(video, torrents);
@@ -399,7 +393,7 @@ Swiper.prototype._identifyContentFromInput = function(input) {
   if (!videoData.title) {
     throw new InputError("I don't understand what the title is.");
   }
-  return util.identifyContent(videoData)
+  return util.identifyContent(this.id, videoData)
   .then(content => {
     if (!content) {
       throw new InputError("I can't find anything with that title.");
@@ -409,19 +403,18 @@ Swiper.prototype._identifyContentFromInput = function(input) {
 };
 
 Swiper.prototype._resolveSearchToEpisode = function(collection) {
-  let isSeries = collection.initialType() === 'series';
-  let breadth = isSeries ? 'series' : 'season';
-  return this.awaitResponse(`I can't search for a ${breadth} all at once. Specify the ` +
-    `${isSeries ? "season and " : ""}episode to continue searching or type download ` +
-    `and I'll get the whole ${breadth}.`,
+  let breadth = collection.getInitialType();
+  let isSeries = breadth === 'series';
+  return this.awaitResponse(`Give the ${isSeries ? "season and " : ""}episode ` +
+    `number${isSeries ? "s" : ""} to search or type "download" to get the whole ${breadth}.`,
     [isSeries ? resp.seasonOrEpisode : resp.episode, resp.download]
   ).then(feedback => {
     if (feedback.match === 'download') {
-      this._downloadCollection(collection);
+      this.queueDownload(collection);
     } else if (isSeries) {
       let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
-      if (!season) {
+      if (!season || !collection.hasSeason(season)) {
         return this._resolveSearchToEpisode(collection);
       } else if (!episode) {
         collection.filterToSeason(season);
@@ -434,7 +427,7 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
       if (!episode) {
         return this._resolveSeasonToEpisode(collection);
       } else {
-        return collection.getEpisode(collection.trackSeason, episode);
+        return collection.getEpisode(collection.getInitialSeason(), episode);
       }
     }
   });
@@ -443,18 +436,20 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
 Swiper.prototype._resolveSeasonToEpisode = function(season) {
   return this.awaitInput(`And the episode?`)
   .then(input => {
-    let episodeNum = this._captureEpisode(input);
+    let [episodeNum] = this._execCapture(input, /(\d+)/g, 1);
+    episodeNum = episodeNum ? parseInt(episodeNum, 10) : null;
     return episodeNum || this._resolveSeasonToEpisode(season);
   })
   .then(episodeNum => {
-    return season.getEpisode(season.trackSeason, episodeNum);
+    console.warn('s -> e', season, episodeNum, season.episodes.find(ep => ep.episodeNum === episodeNum));
+    return season.episodes.find(ep => ep.episodeNum === episodeNum);
   });
 };
 
 // Parses a titleStr into constituent parts
 Swiper.prototype._parseTitle = function(titleStr) {
   const titleFinder = /^([\w \'\"\-\:\,\&]+?)(?: (?:s(?:eason)? ?\d{1,2}.*)|(?:\d{4}\b.*))?$/gi;
-  const yearFinder = /\b\d{4}\b/gi;
+  const yearFinder = /\b(\d{4})\b/gi;
   const epFinder = /\bs(?:eason)? ?(\d{1,2}) ?(?:ep?(?:isode)? ?(\d{1,2}))?\b/gi;
 
   let [title] = this._execCapture(titleStr, titleFinder, 1);
@@ -507,7 +502,7 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
         num = parseInt(numStr, 10);
         if (num > 0 && num <= torrents.length) {
           video.setTorrent(torrents[num - 1]);
-          return this._startDownload(video);
+          return this.queueDownload(video);
         } else {
           return this._showSomeTorrents(video, torrents, type, startIndex);
         }
@@ -554,15 +549,15 @@ Swiper.prototype._removeFirst = function(arr, item) {
 };
 
 Swiper.prototype._captureSeason = function(str) {
-  const seasonFinder = /\bs?(?:eason)? ?(\d{1,2})\b/gi;
+  const seasonFinder = /(?:[^a-z]|\b)s(?:eason)? ?(\d{1,2})(?:\D|\b)/gi;
   let [season] = this._execCapture(str, seasonFinder, 1);
-  return season;
+  return parseInt(season, 10);
 };
 
 Swiper.prototype._captureEpisode = function(str) {
-  const epFinder = /\bep?(?:isode)? ?(\d{1,2})\b/gi;
+  const epFinder = /(?:[^a-z]|\b)ep?(?:isode)? ?(\d{1,2})(?:\D|\b)/gi;
   let [ep] = this._execCapture(str, epFinder, 1);
-  return ep;
+  return parseInt(ep, 10);
 };
 
 Swiper.prototype._execCapture = function(str, regex, numCaptures) {

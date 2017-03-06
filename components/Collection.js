@@ -2,34 +2,32 @@
 
 const _ = require('underscore');
 const Content = require('./Content.js');
+const util = require('../util/util.js');
 
 // A collection of episodes
-function Collection(title, episodes, initialType) {
-  Content.call(this, title, 'collection');
+function Collection(swiperId, title, episodes, optInitialType, optInitialSeason) {
+  Content.call(this, swiperId, title, 'collection');
   this.episodes = episodes;
-  this.initialType = initialType; // Should be 'series' or 'season'.
+
+  // These are helpers indicating only the origins of the collection.
+  // These are only used when created by the user do not determine the identity of the collection.
+  this.initialType = optInitialType; // Should be 'series' or 'season'.
+  this.initialSeason = optInitialSeason; // Should be the number of the season, if applicable.
+
   this.createdAt = new Date();
-  this.trackNew = false;
-  this.trackSeason = null;
 }
 _.extend(Collection.prototype, Content.prototype);
 
-Collection.prototype.trackNew = function(trackNew) {
-  this.trackNew = trackNew;
-};
-
-Collection.prototype.trackSeason = function(seasonNum) {
-  this.trackSeason = seasonNum;
-};
-
 Collection.prototype.filterEpisodes = function(callback) {
-  this.episodes = this.episodes.map((ep, i) => callback(ep, i));
+  this.episodes = this.episodes.filter((ep, i) => callback(ep, i));
 };
 
 Collection.prototype.filterToSeason = function(seasonNum) {
-  this.trackNew(false);
-  this.trackSeason(seasonNum);
   this.filterEpisodes(ep => ep.seasonNum === seasonNum);
+};
+
+Collection.prototype.hasSeason = function(seasonNum) {
+  return !!this.episodes.find(ep => ep.seasonNum === seasonNum);
 };
 
 Collection.prototype.getEpisode = function(seasonNum, episodeNum) {
@@ -37,45 +35,106 @@ Collection.prototype.getEpisode = function(seasonNum, episodeNum) {
 };
 
 Collection.prototype.getInitialType = function() {
-  return this.getInitialType;
+  return this.initialType;
 };
 
-// Finds the earliest episode and season (after optStartSeason and optStartEpisode)
-Collection.prototype.getNextEpisode = function(optStartSeason, optStartEpisode) {
-  let startSeason = optStartSeason || 1;
-  let startEpisode = optStartEpisode || 0;
-  let next = null;
-  this.episodes.forEach(ep => {
-    let afterInit = ep.seasonNum >= startSeason && ep.episodeNum > startEpisode;
-    let earlierSeason = ep.seasonNum < next.seasonNum;
-    let earlierEp = ep.seasonNum === next.seasonNum && ep.episodeNum < next.episodeNum;
-    if (afterInit && (earlierSeason || earlierEp)) {
-      next = ep;
-    }
-  });
-  return next;
+Collection.prototype.getInitialSeason = function() {
+  return this.initialSeason;
 };
 
-// Gets the intersection of this and another content item
-Collection.prototype.getIntersection = function(content) {
+// Indicates whether the collection contains any of content.
+Collection.prototype.containsAny = function(content) {
   if (content.getType() === 'episode') {
-    return this.episodes.find(ep => ep.episodeNum === content.episodeNum &&
-      ep.title === content.title) || null;
+    return !!this.episodes.find(ep => ep.equals(content));
   } else if (content.getType() === 'collection') {
-    return this.episodes.filter(ep1 => {
-      return content.episodes.find(ep2 => ep1.title === ep2.title &&
-        ep1.episodeNum === ep2.episodeNum);
-    });
-  } else {
-    return null;
+    // Find an episode in content that is in this.
+    return content.episodes.find(ep1 => this.episodes.find(ep2 => ep1.equals(ep2)));
   }
 };
+
+// Indicates whether the collection contains all of content.
+Collection.prototype.containsAll = function(content) {
+  if (content.getType() === 'episode') {
+    return !!this.episodes.find(ep => ep.equals(content));
+  } else if (content.getType() === 'collection') {
+    // Find an episode in content that is not in this.
+    return !content.episodes.find(ep1 => {
+      !this.episodes.find(ep2 => ep1.equals(ep2));
+    });
+  }
+};
+
+Collection.prototype.addContent = function(content) {
+  if (content.getType() === 'episode' && !this.episodes.find(ep => ep.equals(content))) {
+    this.episodes.unshift(content);
+  } else if (content.getType() === 'collection') {
+    let newStuff = content.episodes.filter(ep1 => {
+      return !this.episodes.find(ep2 => ep1.equals(ep2));
+    });
+    this.episodes.unshift(newStuff);
+  }
+  this.episodes.sort((a, b) => a.isEarlierThan(b) ? -1 : 1);
+};
+
+Collection.prototype.removeContent = function(content) {
+  if (content.getType() === 'episode') {
+    this.episodes = this.episodes.filter(ep => !ep.equals(content));
+  } else if (content.getType() === 'collection') {
+    this.episodes = this.episodes.filter(ep1 => {
+      return !content.episodes.find(ep2 => ep1.equals(ep2));
+    });
+  }
+};
+
+Collection.prototype.popArray = function(count) {
+  count = count || 1;
+  let removed = this.episodes.slice(0, count);
+  this.episodes = this.episodes.slice(count);
+  return removed;
+};
+
+Collection.prototype.isEmpty = function() {
+  return this.episodes.length === 0;
+};
+
+Collection.prototype.getDesc = function() {
+  let epDesc = "";
+  let epChain = 0;
+  let lastEpisode = null;
+  let lastSeason = null;
+  this.episodes.forEach((ep, i) => {
+    if (!lastSeason && !lastEpisode) {
+      epDesc += `S${ep.getPaddedSeason()}E${ep.getPaddedEpisode()}`;
+    } else if (ep.seasonNum > lastSeason) {
+      // New season
+      epDesc += `, S${ep.getPaddedSeason()}E${ep.getPaddedEpisode()}`;
+      epChain = 0;
+    } else if (ep.seasonNum === lastSeason && (ep.episodeNum > lastEpisode + 1)) {
+      // Same season, later episode
+      epDesc += `${epChain > 1 ?
+        `-${util.padZeros(lastEpisode)}` : ``} & E${ep.getPaddedEpisode()}`;
+      epChain = 0;
+    } else if (i === this.episodes.length - 1) {
+      // Last episode
+      epDesc += `-${ep.getPaddedEpisode()}`;
+    } else {
+      epChain++;
+    }
+    lastSeason = ep.seasonNum;
+    lastEpisode = ep.episodeNum;
+  });
+  return `${this.title} ${epDesc}`;
+};
+
+// S01E01-12, S02E01-04 & 06-08, S04E10
 
 Collection.prototype.getObject = function() {
   return {
     type: this.type,
+    initialType: this.initialType,
     title: this.title,
-    episodes: this.episodes.map(ep => ep.getObject())
+    episodes: this.episodes.map(ep => ep.getObject()),
+    swiperId: this.swiperId
   };
 };
 

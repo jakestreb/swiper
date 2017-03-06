@@ -2,7 +2,8 @@
 
 const settings = require('../util/settings.js');
 
-function Torrent(stats) {
+function Torrent(video, stats) {
+  this.video = video;
   this.name = stats.name;
   this.size = _getSizeMb(stats.size);
   this.seeders = stats.seeders;
@@ -36,6 +37,10 @@ Torrent.prototype.getTier = function(type) {
   if (qIndex === -1) {
     return 0;
   }
+  if (this.video.type === 'episode' && this.video.releaseDate > this.uploadDate) {
+    // If its a TV episode that was uploaded before release, it's no good.
+    return 0;
+  }
   let size = this.size >= settings.size[type].min && this.size <= settings.size[type].max;
   return size ? (qs - qIndex) + (qs * (this.seeders >= settings.minSeeders ? 1 : 0)) : 0;
 };
@@ -64,10 +69,10 @@ Torrent.prototype.getDownloadInfo = function() {
     return this.name + "\n";
   } else {
     return this.name + "\n" +
-      "| Peers: " + this.tfile.peers + "\n" +
-      "| Mb/s: " + (this.tfile.downloadSpeed / 1000000) + "\n" +
-      "| Progress: " + (this.tfile.progress * 100) + "%\n" +
-      "| Time left: " + (this.tfile.timeRemaining / 60000) + "min\n";
+      "| Peers: " + this.tfile.numPeers + "\n" +
+      "| Speed: " + (this.tfile.downloadSpeed / 1000000).toPrecision(3) + " Mb/s\n" +
+      "| Progress: " + (this.tfile.progress * 100).toPrecision(3) + "%\n" +
+      "| Time left: " + (this.tfile.timeRemaining / 60000).toPrecision(4) + " min\n";
   }
 };
 
@@ -88,7 +93,7 @@ function _getSizeMb(sizeStr) {
     let factor = factorMap[units[0].toLowerCase()];
     return val * factor;
   } catch (err) {
-    console.error('Failed to get torrent size.', sizeStr);
+    throw new Error('Failed to get torrent size: ' + sizeStr);
   }
 }
 

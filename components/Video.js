@@ -4,8 +4,8 @@ const _ = require('underscore');
 const Content = require('./Content.js');
 
 // Should not be instantiated.
-function Video(title, type) {
-  Content.call(this, title, type);
+function Video(swiperId, title, type) {
+  Content.call(this, swiperId, title, type);
   if (!title) {
     throw new Error('Video must have a title.');
   }
@@ -30,8 +30,14 @@ Video.prototype.isVideo = function() {
   return true;
 };
 
-Video.prototype.getIntersection = function(video) {
-  throw new Error("Not implemented.");
+// Indicates whether the video contains any of content.
+Video.prototype.containsAny = function(content) {
+  return content.getType() === this.getType() && this.equals(content);
+};
+
+// Indicates whether the video contains all of content.
+Video.prototype.containsAll = function(content) {
+  return content.getType() === this.getType() && this.equals(content);
 };
 
 Video.prototype.getSearchTerm = function() {

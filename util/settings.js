@@ -2,11 +2,11 @@
 
 module.exports = {
   quality: {
-    tv: [/720p/gi, /1080p/gi, /HD/gi], // keyword preference order
+    episode: [/720p/gi, /1080p/gi, /HD/gi], // keyword preference order
     movie: [/1080p/gi, /720p/gi, /HD/gi]
   },
   size: {
-    tv: {
+    episode: {
       min: 300, // Mb
       max: 2000
     },
@@ -18,7 +18,12 @@ module.exports = {
   // Low seeder tier to determine download pick quality. Things with fewer seeders than this
   // will still be downloaded, but as a last priority.
   minSeeders: 20,
-  checkPeriod: 86400, // seconds after which monitored shows/movies should be searched for
+  monitor: {
+    hour: 22, // 0-23, hour at which monitored should be searched.
+    minute: 0,  // 0-59, minute after the hour at which monitored should be searched.
+    repeatWait: 20, // minutes after failure to find content released the same day to search again.
+    repeatCount: 9 // number of times after failure to find content released the same day.
+  },
   displayTorrents: 4, // Number of torrents to show at a time after searching.
-  concEps: 3 // Concurrent episodes to download of the same show on a large request.
+  maxDownloads: 3 // Concurrent downloads allowed per swiper instance.
 };

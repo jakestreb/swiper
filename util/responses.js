@@ -27,7 +27,7 @@ exports.download = {
 
 exports.seasonOrEpisode = {
   value: 'episode',
-  regex: /\b((s(eason)? ?(\d{1,2}))|(ep?(isode)? ?(\d{1,2})))\b/gi
+  regex: /([^a-z]|\b)((s(eason)? ?(\d{1,2}))|(ep?(isode)? ?(\d{1,2})))(\D|\b)/gi
 };
 
 exports.episode = {

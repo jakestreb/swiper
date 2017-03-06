@@ -1,12 +1,13 @@
 'use strict';
 
 // Should not be instantiated.
-function Content(title, type) {
+function Content(swiperId, title, type) {
   if (!title) {
     throw new Error('Content must have a title.');
   }
   this.title = title;
   this.type = type; // should be 'movie', 'episode', or 'collection'.
+  this.swiperId = swiperId;
 }
 
 Content.prototype.getTitle = function() {
@@ -19,10 +20,6 @@ Content.prototype.getType = function() {
 
 Content.prototype.isVideo = function() {
   return false;
-};
-
-Content.prototype.getIntersection = function(content) {
-  throw new Error('Not implemented.');
 };
 
 Content.prototype.getObject = function() {
