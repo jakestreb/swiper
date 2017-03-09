@@ -34,7 +34,7 @@ module.exports = {
   abort: {
     func: 'abort',
     isAlias: false,
-    desc: "Aborts the last download if started in the last minute."
+    desc: "Aborts all current downloads."
   },
   cancel: {
     isAlias: false,

@@ -7,7 +7,6 @@ const readFile = Promise.promisify(fs.readFile);
 const writeFile = Promise.promisify(fs.writeFile);
 
 const Swiper = require('./Swiper.js');
-const CLI = require('./CLI.js');
 const TorrentClient = require('./TorrentClient.js');
 const Movie = require('./Movie.js');
 const Episode = require('./Episode.js');
@@ -29,21 +28,18 @@ function Dispatcher() {
     // TODO: Restart all the downloads that were in progess, and tell the users.
   });
 
-  // Counter to give ids to swipers.
-  this._counter = 1;
-
   // Start monitoring items.
   this.startMonitoring();
 }
 
-Dispatcher.prototype.addCLISwiper = function() {
-  let cli = new CLI();
-  let id = this._counter++;
-  this.swipers[id] = new Swiper(this, cli, id);
-};
-
-Dispatcher.prototype.addFacebookSwiper = function() {
-  // TODO
+// Sends a message to the swiper with id, or creates a new swiper if it does not exist.
+Dispatcher.prototype.acceptMessage = function(id, message, fromSwiper) {
+  if (this.swipers[id]) {
+    this.swipers[id].toSwiper(message);
+  } else {
+    // New swiper
+    this.swipers[id] = new Swiper(this, id, fromSwiper);
+  }
 };
 
 // Search for monitored items daily at the time given in settings.
@@ -93,6 +89,17 @@ Dispatcher.prototype.searchMonitored = function(optFilter) {
       }, Promise.resolve());
     }
     return interested.length;
+  });
+};
+
+// Aborts downloads with the given id
+Dispatcher.prototype.abortDownloads = function(id) {
+  this.downloading = this.downloading.filter(dwn => {
+    if (dwn.swiperId === id) {
+      dwn.torrent.cancelDownload();
+      return false;
+    }
+    return true;
   });
 };
 
@@ -147,7 +154,7 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
 Dispatcher.prototype._addToArray = function(swiperId, arr, add) {
   let index = arr.findIndex(existing => existing.getTitle() === add.getTitle());
   if (index > -1) {
-    let [sameTitle] = arr[index];
+    let sameTitle = arr[index];
     let typeA = add.getType(), typeB = sameTitle.getType();
     if (typeA === 'movie' && typeB === 'movie') {
       // Both are movies. Already present.

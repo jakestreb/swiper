@@ -1,6 +1,7 @@
 'use strict';
 
 const WebTorrent = require('webtorrent');
+const path = require('path');
 
 function TorrentClient(optErrorCallback) {
   this.client = null;
@@ -23,7 +24,7 @@ TorrentClient.prototype.startClient = function() {
 TorrentClient.prototype.download = function(torrent) {
   let client = new WebTorrent();
   return new Promise((resolve, reject) => {
-    client.add(torrent.getMagnet(), tfile => {
+    client.add(torrent.getMagnet(), { path: path.resolve(__dirname, '../downloads') }, tfile => {
       torrent.setProgressFile(tfile);
       tfile.on('done', () => { resolve(torrent); });
       tfile.on('error', () => { reject(torrent); });

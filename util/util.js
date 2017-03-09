@@ -95,7 +95,7 @@ function exportVideo(video) {
     // Move the file(s) to the final directory.
     let tfile = video.torrent.tfile;
     return Promise.all(tfile.files.map(file => {
-      let origPath = path.join(tfile.path, file.name);
+      let origPath = path.join(tfile.path, file.path);
       console.warn('A', tfile.path);
       console.warn('B', file.name);
       console.warn('dwld path', origPath);

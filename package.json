@@ -1,7 +1,7 @@
 {
   "name": "swiper",
   "productName": "Swiper",
-  "version": "0.1.0-dev",
+  "version": "1.0.0",
   "description": "download helper",
   "scripts": {
     "start": "node server.js"
@@ -10,10 +10,12 @@
   "dependencies": {
     "async-lock": "^0.3.9",
     "bluebird": "^3.4.7",
+    "body-parser": "^1.17.1",
     "dotenv": "^4.0.0",
     "express": "^4.14.1",
     "imdb-api": "^2.2.1",
     "is-online": "^6.1.0",
+    "request": "^2.80.0",
     "thepiratebay": "^1.3.3",
     "underscore": "^1.8.3",
     "webtorrent": "^0.98.8"
