@@ -2,6 +2,7 @@
 module.exports = {
   download: {
     func: 'download',
+    arg: true,
     isAlias: false,
     aliases: ['get'],
     desc: "Downloads the best torrent for a show or movie."
@@ -12,11 +13,13 @@ module.exports = {
   },
   search: {
     func: 'search',
+    arg: true,
     isAlias: false,
     desc: "Returns a list of torrents for a show or movie."
   },
   monitor: {
     func: 'monitor',
+    arg: true,
     isAlias: false,
     aliases: ['watch'],
     desc: "Adds an item to check on intermittently until it's found.\n"
@@ -25,8 +28,14 @@ module.exports = {
     func: 'monitor',
     isAlias: true
   },
+  check: {
+    func: 'check',
+    isAlias: false,
+    desc: "Perform search for monitored items now.\n"
+  },
   remove: {
     func: 'remove',
+    arg: true,
     isAlias: false,
     aliases: ['delete'],
     desc: "Removes the given item from monitored, queued, or downloading."
@@ -39,16 +48,6 @@ module.exports = {
   cancel: {
     isAlias: false,
     desc: "Ends the current conversation.\n"
-  },
-  pause: {
-    func: 'pause',
-    isAlias: false,
-    desc: "Pauses peer collection for the item download entered."
-  },
-  resume: {
-    func: 'resume',
-    isAlias: false,
-    desc: "Resumes peer collection for the item download entered.\n"
   },
   status: {
     func: 'getStatus',
@@ -74,6 +73,4 @@ module.exports = {
     func: 'getCommands',
     isAlias: true
   },
-  // TODO: there should be a way of manually calling for search of monitored content
-  // TODO: remove pause/resume?
 };

@@ -3,6 +3,8 @@
 const WebTorrent = require('webtorrent');
 const path = require('path');
 
+const downloadDir = path.resolve(__dirname, '../downloads');
+
 function TorrentClient(optErrorCallback) {
   this.client = null;
   this.errorCallback = optErrorCallback;
@@ -12,7 +14,7 @@ function TorrentClient(optErrorCallback) {
 
 TorrentClient.prototype.startClient = function() {
   this.client = new WebTorrent();
-  this.client.on('error', () => {
+  this.client.once('error', () => {
     if (this.errorCallback) {
       this.errorCallback();
     }
@@ -22,12 +24,11 @@ TorrentClient.prototype.startClient = function() {
 };
 
 TorrentClient.prototype.download = function(torrent) {
-  let client = new WebTorrent();
   return new Promise((resolve, reject) => {
-    client.add(torrent.getMagnet(), { path: path.resolve(__dirname, '../downloads') }, tfile => {
+    this.client.add(torrent.getMagnet(), { path: downloadDir }, tfile => {
       torrent.setProgressFile(tfile);
-      tfile.on('done', () => { resolve(torrent); });
-      tfile.on('error', () => { reject(torrent); });
+      tfile.once('done', () => { resolve(torrent); });
+      tfile.once('error', () => { reject(torrent); });
     });
   });
 };

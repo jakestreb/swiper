@@ -1,15 +1,25 @@
 'use strict';
 
 require('dotenv').config();
+const Promise = require('bluebird');
 const bodyParser = require("body-parser");
 const request = require("request");
 const express = require("express");
+const rimraf = require("rimraf");
 const app = express();
+const rimrafAsync = Promise.promisify(rimraf);
 
 const Dispatcher = require('./components/Dispatcher.js');
 
 const port = 8300;
 const gatewayUrl = 'https://limitless-island-56260.herokuapp.com/swiper';
+
+// Delete everything in downloads folder.
+rimrafAsync('./downloads/*').then(err => {
+  if (err) {
+    console.warn(err);
+  }
+});
 
 // For now, start the Dispatcher and listen on the command line.
 let dispatcher = new Dispatcher();

@@ -1,5 +1,7 @@
 'use strict';
 
+const path = require('path');
+const rimraf = require('rimraf');
 const settings = require('../util/settings.js');
 
 function Torrent(video, stats) {
@@ -47,41 +49,33 @@ Torrent.prototype.getTier = function(type) {
 
 Torrent.prototype.cancelDownload = function() {
   this.tfile.destroy();
-};
-
-// Note: This only pauses connection to new peers.
-Torrent.prototype.pauseDownload = function() {
-  if (!this.isPaused) {
-    this.isPaused = true;
-    this.tfile.pause();
-  }
-};
-
-Torrent.prototype.resumeDownload = function() {
-  if (this.isPaused) {
-    this.isPaused = false;
-    this.tfile.resume();
-  }
+  this.tfile.files.map(file => {
+    let origPath = path.join(this.tfile.path, file.path);
+    rimraf(origPath);
+  });
 };
 
 Torrent.prototype.getDownloadInfo = function() {
   if (!this.tfile) {
     return this.name + "\n";
+  } else if (this.isPaused) {
+    return this.name + "\n" +
+      "    Progress: " + (this.tfile.progress * 100).toPrecision(3) + "% (Paused)\n";
   } else {
     return this.name + "\n" +
-      "| Peers: " + this.tfile.numPeers + "\n" +
-      "| Speed: " + (this.tfile.downloadSpeed / 1000000).toPrecision(3) + " Mb/s\n" +
-      "| Progress: " + (this.tfile.progress * 100).toPrecision(3) + "%\n" +
-      "| Time left: " + (this.tfile.timeRemaining / 60000).toPrecision(4) + " min\n";
+      "    Peers: " + this.tfile.numPeers + "\n" +
+      "    Speed: " + (this.tfile.downloadSpeed / 1000000).toPrecision(3) + " Mb/s\n" +
+      "    Progress: " + (this.tfile.progress * 100).toPrecision(3) + "%\n" +
+      "    Time left: " + (this.tfile.timeRemaining / 60000).toPrecision(4) + " min\n";
   }
 };
 
 Torrent.prototype.toString = function() {
   return this.name + "\n" +
-    "| Size: " + this.size + " Mb\n" +
-    "| SE: " + this.seeders + "\n" +
-    "| LE: " + this.leechers + "\n" +
-    "| Uploaded: " + this.uploadDate + "\n";
+    "  Size: " + this.size + " Mb\n" +
+    "  SE: " + this.seeders + "\n" +
+    "  LE: " + this.leechers + "\n" +
+    "  Uploaded: " + this.uploadDate + "\n";
 };
 
 // Expects a string which starts with a decimal number and either GiB, MiB, or kiB

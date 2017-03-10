@@ -78,12 +78,14 @@ exports.torrentSearch = torrentSearch;
 function exportVideo(video) {
   let dirs = video.getType() === 'movie' ? ['movies'] :
     ['tv', video.getTitle(), `Season ${video.seasonNum}`];
-  console.warn('dirs', dirs);
-  console.warn('rootDir', rootDir);
+  // TODO: remove
+  // console.warn('dirs', dirs);
+  // console.warn('rootDir', rootDir);
   return Promise.reduce(dirs, (acc, dir) => {
     // Check if all directories exist along the way, creating them if they don't.
-    console.warn('acc', acc);
-    console.warn('dir', dir);
+    // TODO: remove
+    // console.warn('acc', acc);
+    // console.warn('dir', dir);
     return Promise.resolve(acc).then(prevPath => {
       let newPath = path.join(prevPath, dir);
       return access(newPath, fs.constants.F_OK)
@@ -96,10 +98,11 @@ function exportVideo(video) {
     let tfile = video.torrent.tfile;
     return Promise.all(tfile.files.map(file => {
       let origPath = path.join(tfile.path, file.path);
-      console.warn('A', tfile.path);
-      console.warn('B', file.name);
-      console.warn('dwld path', origPath);
-      console.warn('final path', finalPath);
+      // TODO: remove
+      // console.warn('A', tfile.path);
+      // console.warn('B', file.name);
+      // console.warn('dwld path', origPath);
+      // console.warn('final path', finalPath);
       return rename(origPath, path.join(finalPath, file.name));
     }));
   });

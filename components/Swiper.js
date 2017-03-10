@@ -8,9 +8,7 @@ const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
-// TODO: Set torrent download path to ./downloads. Clear ./downloads on startup.
-// TODO: Abort does not start queued downloads.
-// TODO: Find out what the potential memory leak on download is (probably ok).
+// TODO: Test monitored found torrent and monitored released today.
 // TODO: Restart on all exceptions.
 // TODO: Create readme (heroku address, how to check ips, etc).
 // TODO: Clear all TODOs in the project.
@@ -27,6 +25,9 @@ function Swiper(dispatcher, id, fromSwiper) {
   // This should be called by the dispatcher when there is a message for this swiper.
   this.toSwiper = () => {};
   this.fromSwiper = fromSwiper;
+
+  // Immediately start downloading any items from the queue.
+  this._downloadFromQueue(settings.maxDownloads);
 
   this.awaitCommand(`I'm Swiper. Type "help" to see what I can do.`);
 }
@@ -103,17 +104,21 @@ Swiper.prototype.parseCommand = function(input) {
 };
 
 Swiper.prototype.getStatus = function() {
+  let indentFunc = item => (item.swiperId === this.id ? '* ' : '  ');
   return this.dispatcher.readMemory()
   .then(memory => {
     return "\nMonitoring:\n" +
-      (memory.monitored.map(item => item.getDesc()).join("\n") || "None") + "\n\n" +
+      (memory.monitored.map(item => indentFunc(item) + item.getDesc())
+        .join("\n") || "None") + "\n\n" +
       "Queued:\n" +
-      (memory.queued.map(item => item.getDesc()).join("\n") || "None") + "\n\n" +
+      (memory.queued.map(item => indentFunc(item) + item.getDesc())
+        .join("\n") || "None") + "\n\n" +
       "Downloading:\n" +
       (this.downloading.reduce((acc, val) =>
-        acc + val.torrent.getDownloadInfo() + "\n", "") || "None\n") + "\n" +
+        acc + indentFunc(val) + val.torrent.getDownloadInfo() + "\n", "") || "None\n") + "\n" +
       "Completed:\n" +
-      (this.completed.reduce((acc, val) => acc + val.getDesc() + "\n", "") || "None\n");
+      (this.completed.reduce((acc, val) => acc + indentFunc(val) + val.getDesc() + "\n", "")
+        || "None\n");
   });
 };
 
@@ -163,6 +168,12 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
   });
 };
 
+Swiper.prototype.check = function() {
+  this.send('Searching for monitored content...');
+  return this.dispatcher.searchMonitored()
+  .then(() => 'Done searching.');
+};
+
 Swiper.prototype.download = function(input) {
   return isOnline().then(online => {
     if (!online) {
@@ -170,8 +181,8 @@ Swiper.prototype.download = function(input) {
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
-        this.queueDownload(content);
-        return "Added the download to the queue.";
+        this.queueDownload(content, !content.isVideo());
+        return "Queued the download.";
       });
     }
   });
@@ -181,7 +192,7 @@ Swiper.prototype.download = function(input) {
 // or starts the download if max concurrent downloads is not met.
 // If noPrompt is set, no prompts will be offered to the user.
 // NOTE: This is called before the torrent is found.
-Swiper.prototype.queueDownload = function(content) {
+Swiper.prototype.queueDownload = function(content, noPrompt) {
   let addCount = settings.maxDownloads - this.downloadCount;
   let ready = [];
   let queueItem = null;
@@ -196,14 +207,22 @@ Swiper.prototype.queueDownload = function(content) {
   Promise.try(() => queueItem ?
     this.dispatcher.updateMemory(this.id, 'queued', 'add', queueItem) : null)
   .then(() => {
-    return ready.reduce((acc, video) => {
-      // Hide the resolve prompt for individual videos if this is part of a collection.
-      return acc.then(() => this._resolveVideoDownload(video, !content.isVideo()));
-    }, Promise.resolve());
+    ready.forEach(video => {
+      this._resolveVideoDownload(video, noPrompt)
+      .then(success => {
+        if (noPrompt && !success) {
+          // Monitor failures.
+          this.send(`Failed to find ${video.getDesc()}, adding to monitored.`);
+          this._monitorContent(video);
+          this._downloadFromQueue();
+        }
+      });
+    });
   });
 };
 
-// If noPrompt is set, no prompts will be offered to the user.
+// If noPrompt is set, no prompts will be offered to the user. Instead, returns
+// a boolean success indicator.
 // Sets the torrent for a video and downloads it.
 Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
   noPrompt ? null : this.send(`Looking for ${video.getTitle()} downloads...`);
@@ -211,37 +230,38 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
   .then(torrents => {
     let best = this._autoPickTorrent(torrents, video.getType());
     if (!best) {
-      return noPrompt || this.awaitResponse(`I can't find a good torrent. If you'd like to see ` +
-        `the results for yourself, type "search", otherwise type "monitor" and I'll keep an eye ` +
-        `out for ${video.getTitle()}`, [resp.search, resp.monitor])
+      return noPrompt ? false : this.awaitResponse(`I can't find a good torrent. If you'd like ` +
+        `to see the results for yourself, type "search", otherwise type "monitor" and I'll ` +
+        `keep an eye out for ${video.getTitle()}`, [resp.search, resp.monitor])
         .then(resp => {
           return resp.match === 'search' ? this._searchVideo(video) :
             this._monitorContent(video);
         });
     } else {
       video.setTorrent(best);
-      return this._startDownload(video);
+      if (noPrompt) {
+        this._startDownload(video);
+        return true;
+      } else {
+        return this._startDownload(video);
+      }
     }
   });
 };
 
 Swiper.prototype._startDownload = function(video) {
-  this.lastDownloads.push(video);
   // Remove the video from monitoring and queueing, if it was in those places.
   this._removeVideo(video, true, true);
   this.downloading.push(video);
   this.downloadCount++;
   this.torrentClient.download(video.torrent)
   .then(() => {
-    this._removeFirst(this.downloading, video);
+    this._popDownload(video);
     this.completed.push(video);
     return util.exportVideo(video);
   })
   .then(() => {
     this.send(`${video.getTitle()} download complete!`);
-    // Remove from lastDownloads array
-    let i = this.lastDownloads.findIndex(v => video.containsAny(v));
-    this.lastDownloads.splice(i, 1);
     // Try to download the next item in this swiper's queue.
     this.downloadCount--;
     this._downloadFromQueue();
@@ -255,18 +275,22 @@ Swiper.prototype._startDownload = function(video) {
     `"status" to view progess. Is there anything else you need?`;
 };
 
+// optCount gives the number of VIDEOS in the queue to attempt downloading.
 Swiper.prototype._downloadFromQueue = function(optCount) {
-  optCount = optCount || 0;
+  optCount = optCount || 1;
   return this.dispatcher.readMemory()
   .then(memory => {
     let myQueue = memory.queued.filter(item => item.swiperId === this.id);
     let next = myQueue.shift();
     if (next) {
+      // If a collection is popped, enough videos may be starting already.
+      let popCount = next.isVideo() ? 1 : next.episodes.length;
       return this.dispatcher.updateMemory(this.id, 'queued', 'remove', next)
-      .then(() => this.queueDownload(next))
+      .then(() => this.queueDownload(next, true))
       .then(() => {
+        optCount = optCount - popCount;
         if (optCount > 0) {
-          return this._downloadFromQueue(optCount - 1);
+          return this._downloadFromQueue(optCount);
         }
       });
     }
@@ -278,18 +302,24 @@ Swiper.prototype.getCommands = function() {
   for (let cmd in commands) {
     let cmdInfo = commands[cmd];
     if (!cmdInfo.isAlias) {
-      let tabLen = 12 - cmd.length;
-      output += `${cmd}:${' '.repeat(tabLen)}${commands[cmd].desc}\n`;
+      let arg = cmdInfo.arg ? ' <content>' : '';
+      let tab = ' '.repeat(23 - cmd.length - arg.length);
+      output += `${cmd}${arg}${tab}${cmdInfo.desc}\n`;
     }
   }
-  output += `\nIf you're getting an incorrect match, try adding the release ` +
-    `year after the title.\n`;
+  output += `\nWhere <content> is one of:\n` +
+    `    <movie> (<year>)\n` +
+    `    <series> (<year>) (season <num>) (episode <num>)\n`;
+  output += `\nOn mismatch, try including the year.\n`;
   return output;
 };
 
 // Aborts the all current downloads if it was started in the last 60s.
 Swiper.prototype.abort = function() {
-  this.dispatcher.abortDownloads(this.id);
+  this.downloading.filter(video => video.swiperId === this.id).forEach(video => {
+    this._popDownload(video);
+    video.torrent.cancelDownload();
+  });
   this.downloadCount = 0;
   // Download the next things in the queue.
   this._downloadFromQueue(settings.maxDownload);
@@ -346,27 +376,7 @@ Swiper.prototype._confirmAction = function(promptText, callback, optYes) {
 
 Swiper.prototype._cancelDownload = function(video) {
   video.torrent.cancelDownload();
-  this.downloading._removeFirst(video);
-};
-
-Swiper.prototype.pause = function(input) {
-  return this._pauseOrResume(input, true);
-};
-
-Swiper.prototype.resume = function(input) {
-  return this._pauseOrResume(input, false);
-};
-
-// Helper to perform pause/resume action
-Swiper.prototype._pauseOrResume = function(input, isPause) {
-  let action = isPause ? 'Pause' : 'Resume';
-  return this._identifyContentFromInput(input)
-  .then(video => {
-    let relevant = this.downloading.find(item => item.equals(video));
-    return this._confirmAction(`${action} ${relevant.getTitle()}?`,
-      () => { isPause ? relevant.torrent.pauseDownload() : relevant.torrent.resumeDownload(); }
-    ).then(() => '${action}d.');
-  });
+  this._popDownload(video);
 };
 
 Swiper.prototype.search = function(input) {
@@ -382,7 +392,6 @@ Swiper.prototype.search = function(input) {
 };
 
 Swiper.prototype._searchVideo = function(video) {
-  console.warn('searchVid', video);
   return util.torrentSearch(video, 2)
   .then(torrents => {
     if (torrents.length > 0) {
@@ -557,11 +566,16 @@ Swiper.prototype._removePrefix = function(str, prefix) {
 };
 
 // Removes the first index of the item from the array.
-Swiper.prototype._removeFirst = function(arr, item) {
-  let index = arr.indexOf(item);
+Swiper.prototype._removeFirst = function(arr, item, optEqualityFunc) {
+  optEqualityFunc = optEqualityFunc || ((a, b) => a === b);
+  let index = arr.findIndex(arrItem => optEqualityFunc(item, arrItem));
   if (index > -1) {
     arr.splice(index, 1);
   }
+};
+
+Swiper.prototype._popDownload = function(video) {
+  this._removeFirst(this.downloading, video, (a, b) => a.containsAny(b));
 };
 
 Swiper.prototype._captureSeason = function(str) {

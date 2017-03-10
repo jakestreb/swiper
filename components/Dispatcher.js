@@ -92,17 +92,6 @@ Dispatcher.prototype.searchMonitored = function(optFilter) {
   });
 };
 
-// Aborts downloads with the given id
-Dispatcher.prototype.abortDownloads = function(id) {
-  this.downloading = this.downloading.filter(dwn => {
-    if (dwn.swiperId === id) {
-      dwn.torrent.cancelDownload();
-      return false;
-    }
-    return true;
-  });
-};
-
 Dispatcher.prototype.readMemory = function() {
   return this.memoryLock.acquire('key', () => {
     return readFile('util/memory.json', 'utf8');
@@ -130,10 +119,12 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
     .then(file => this._parseFile(file))
     .then(memory => {
       let t = memory[target];
-      console.warn('origArr', t);
+      // TODO: Remove
+      // console.warn('origArr', t);
       let finalArr = method === 'add' ? this._addToArray(swiperId, t, item) :
         this._removeFromArray(swiperId, t, item);
-      console.warn('finalArr', finalArr);
+      // TODO: Remove
+      // console.warn('finalArr', finalArr);
       memory[target] = finalArr;
       if (finalArr) {
         return writeFile('util/memory.json', JSON.stringify(memory, null, 2));
