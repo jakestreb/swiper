@@ -8,7 +8,6 @@ const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
-// TODO: Download movie queues it and doesnt start the download.
 // TODO: Figure out why there are so many listeners on client.add.
 // TODO: Test monitored found torrent and monitored released today.
 // TODO: Test multiple users.
@@ -402,8 +401,8 @@ Swiper.prototype.search = function(input) {
       return `I don't have a good connection right now. Try again in a few minutes.`;
     } else {
       return this._identifyContentFromInput(input)
-      .then(content => content.isVideo() ? content : this._resolveSearchToEpisode(content))
-      .then(video => this._searchVideo(video));
+      .then(content => content.isVideo() ? this._searchVideo(content) :
+        this._resolveSearchToEpisode(content));
     }
   });
 };
@@ -414,7 +413,7 @@ Swiper.prototype._searchVideo = function(video) {
     if (torrents.length > 0) {
       return this._showTorrents(video, torrents);
     } else {
-      return this.awaitResponse("I can't seem to find that right now. Would you like me to " +
+      return this.awaitResponse("I can't connect to PirateBay right now. Would you like me to " +
         "keep an eye out for it?", [resp.yes, resp.no])
       .then(feedback => {
         if (feedback.match === 'yes') {
@@ -452,7 +451,7 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
     [isSeries ? resp.seasonOrEpisode : resp.episode, resp.download]
   ).then(feedback => {
     if (feedback.match === 'download') {
-      this.queueDownload(collection);
+      this.queueDownload(collection, true);
     } else if (isSeries) {
       let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
