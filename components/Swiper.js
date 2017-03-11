@@ -99,7 +99,7 @@ Swiper.prototype.parseCommand = function(input) {
   // Calls the function mapped to the command in COMMANDS with the content
   // following the command.
   let [req, rem] = this._splitFirst(input);
-  let cmd = commands[req];
+  let cmd = commands[req.toLowerCase()];
   if (cmd && cmd.func) {
     return this[cmd.func](rem);
   } else {
@@ -314,7 +314,7 @@ Swiper.prototype.getCommands = function(optCommand) {
 };
 
 Swiper.prototype._commandDetail = function(cmd) {
-  let cmdInfo = commands[cmd];
+  let cmdInfo = commands[cmd.toLowerCase()];
   if (!cmdInfo || cmdInfo.isAlias) {
     return `${cmd} isn't something I respond to.`;
   } else {
