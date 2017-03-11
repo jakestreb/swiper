@@ -2,17 +2,14 @@
 
 require('dotenv').config();
 const Promise = require('bluebird');
-const bodyParser = require("body-parser");
-const request = require("request");
-const express = require("express");
+const rp = require("request-promise");
 const rimraf = require("rimraf");
-const app = express();
 const rimrafAsync = Promise.promisify(rimraf);
 
 const Dispatcher = require('./components/Dispatcher.js');
 
-const port = 8300;
 const gatewayUrl = 'https://limitless-island-56260.herokuapp.com/swiper';
+const reqTimeout = 20000;
 
 // Delete everything in downloads folder.
 rimrafAsync('./downloads/*').then(err => {
@@ -24,6 +21,7 @@ rimrafAsync('./downloads/*').then(err => {
 // For now, start the Dispatcher and listen on the command line.
 let dispatcher = new Dispatcher();
 
+// Initialize command line Swiper.
 process.stdin.resume();
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', text => {
@@ -31,36 +29,43 @@ process.stdin.on('data', text => {
   dispatcher.acceptMessage('cli', text.trim(), message => { console.log(message); });
 });
 
-app.use(bodyParser.urlencoded({
-  extended: true
-}));
-app.use(bodyParser.json());
+// Start long polling the gateway for Facebook messages.
+function longPoll() {
+  return gatewayGet()
+  .then(resp => {
+    let data = JSON.parse(resp);
+    if (data.messages) {
+      data.messages.forEach(item => {
+        let message = item.message;
+        let id = item.id;
+        // Send the message to the dispatcher, which will route it to the correct Swiper.
+        // Respond by POSTing to the gateway.
+        dispatcher.acceptMessage(`fb:${id}`, message, msg =>
+          gatewayPost({ id: id, message: msg }));
+      });
+    }
+  })
+  .catch(err => {
+    // console.warn('err', err);
+  })
+  .then(() => longPoll());
+}
+longPoll();
 
-app.get("/", (req, res) => {
-  res.send('Running');
-});
-
-// Message from facebook.
-app.post("/facebook", (req, res) => {
-  dispatcher.acceptMessage(`fb:${req.body.id}`, req.body.message, message => {
-    // Send a post request to the gateway with messages from swiper.
-    request({
-      url: gatewayUrl,
-      method: 'POST',
-      json: {
-        message: message
-      }
-    }, (error, response) => {
-      if (error) {
-        console.log('Error sending messages: ', error);
-      } else if (response.body.error) {
-        console.log('Error: ', response.body.error);
-      }
-    });
+// GET request to gateway.
+function gatewayGet() {
+  return rp({
+    url: gatewayUrl,
+    method: 'GET',
+    timeout: reqTimeout
   });
-  res.end();
-});
+}
 
-app.listen(port, () => {
-  console.log(`Listening on port ${port}`);
-});
+// POST request to gateway.
+function gatewayPost(json) {
+  return rp({
+    url: gatewayUrl,
+    method: 'POST',
+    json: json
+  });
+}

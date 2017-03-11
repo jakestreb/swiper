@@ -7,7 +7,7 @@ const downloadDir = path.resolve(__dirname, '../downloads');
 
 function TorrentClient(optErrorCallback) {
   this.client = null;
-  this.errorCallback = optErrorCallback;
+  this.errorCallback = optErrorCallback || (() => {});
 
   this.startClient();
 }
@@ -15,9 +15,7 @@ function TorrentClient(optErrorCallback) {
 TorrentClient.prototype.startClient = function() {
   this.client = new WebTorrent();
   this.client.once('error', () => {
-    if (this.errorCallback) {
-      this.errorCallback();
-    }
+    this.errorCallback();
     this.startClient();
   });
   // TODO: Add automatic seeding when a file is in the output folder.
@@ -29,6 +27,7 @@ TorrentClient.prototype.download = function(torrent) {
       torrent.setProgressFile(tfile);
       tfile.once('done', () => { resolve(torrent); });
       tfile.once('error', () => { reject(torrent); });
+      console.warn('EVENTS', tfile.eventNames());
     });
   });
 };

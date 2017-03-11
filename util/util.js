@@ -5,9 +5,11 @@ const imdb = require('imdb-api');
 const PirateBay = require('thepiratebay');
 const fs = require('fs');
 const path = require('path');
+const rimraf = require('rimraf');
 const access = Promise.promisify(fs.access);
 const mkdir = Promise.promisify(fs.mkdir);
 const rename = Promise.promisify(fs.rename);
+const rimrafAsync = Promise.promisify(rimraf);
 
 const Movie = require('../components/Movie.js');
 const Episode = require('../components/Episode.js');
@@ -103,8 +105,26 @@ function exportVideo(video) {
       // console.warn('B', file.name);
       // console.warn('dwld path', origPath);
       // console.warn('final path', finalPath);
-      return rename(origPath, path.join(finalPath, file.name));
+      return rename(origPath, path.join(finalPath, file.name))
+      .then(() => {
+        // If the file was located in a downloads subdirectory, return it.
+        let splitPath = file.path.split('/');
+        return splitPath.length > 1 ? splitPath[0] : null;
+      });
     }));
+  })
+  .then(subDirs => {
+    let tfile = video.torrent.tfile;
+    let tfilePath = video.torrent.tfile.path;
+    tfile.destroy();
+    subDirs.filter(dir => dir).forEach(dir => {
+      // Remove all file subdirectorys.
+      rimrafAsync(path.join(tfilePath, dir)).then(err => {
+        if (err) {
+          console.warn(err);
+        }
+      });
+    });
   });
 }
 exports.exportVideo = exportVideo;

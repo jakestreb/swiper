@@ -40,6 +40,9 @@ Dispatcher.prototype.acceptMessage = function(id, message, fromSwiper) {
     // New swiper
     this.swipers[id] = new Swiper(this, id, fromSwiper);
   }
+  // console.warn('ACCEPTED MESSAGE', message);
+  // console.warn('id', id);
+  // console.warn('swipers', this.swipers);
 };
 
 // Search for monitored items daily at the time given in settings.

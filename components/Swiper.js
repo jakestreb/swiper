@@ -8,10 +8,15 @@ const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
+// TODO: Download movie queues it and doesnt start the download.
+// TODO: Figure out why there are so many listeners on client.add.
 // TODO: Test monitored found torrent and monitored released today.
+// TODO: Test multiple users.
+
 // TODO: Restart on all exceptions.
 // TODO: Create readme (heroku address, how to check ips, etc).
 // TODO: Clear all TODOs in the project.
+
 function Swiper(dispatcher, id, fromSwiper) {
   this.dispatcher = dispatcher;
   this.id = id;
@@ -181,8 +186,7 @@ Swiper.prototype.download = function(input) {
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
-        this.queueDownload(content, !content.isVideo());
-        return "Queued the download.";
+        return this.queueDownload(content, !content.isVideo());
       });
     }
   });
@@ -191,7 +195,7 @@ Swiper.prototype.download = function(input) {
 // This should always be called to download content. Adds a video to the queue
 // or starts the download if max concurrent downloads is not met.
 // If noPrompt is set, no prompts will be offered to the user.
-// NOTE: This is called before the torrent is found.
+// NOTE: This is usuaully called before the torrent is found, but may be called after it is selected.
 Swiper.prototype.queueDownload = function(content, noPrompt) {
   let addCount = settings.maxDownloads - this.downloadCount;
   let ready = [];
@@ -208,15 +212,19 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
     this.dispatcher.updateMemory(this.id, 'queued', 'add', queueItem) : null)
   .then(() => {
     ready.forEach(video => {
-      this._resolveVideoDownload(video, noPrompt)
-      .then(success => {
-        if (noPrompt && !success) {
-          // Monitor failures.
-          this.send(`Failed to find ${video.getDesc()}, adding to monitored.`);
-          this._monitorContent(video);
-          this._downloadFromQueue();
-        }
-      });
+      if (video.torrent) {
+        this._startDownload(video);
+      } else {
+        this._resolveVideoDownload(video, noPrompt)
+        .then(success => {
+          if (noPrompt && !success) {
+            // Monitor failures.
+            this.send(`Failed to find ${video.getDesc()}, adding to monitored.`);
+            this._monitorContent(video);
+            this._downloadFromQueue();
+          }
+        });
+      }
     });
   });
 };
@@ -251,17 +259,17 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
 
 Swiper.prototype._startDownload = function(video) {
   // Remove the video from monitoring and queueing, if it was in those places.
-  this._removeVideo(video, true, true);
+  this._removeContent(video, true, true);
   this.downloading.push(video);
   this.downloadCount++;
   this.torrentClient.download(video.torrent)
+  .then(() => util.exportVideo(video))
   .then(() => {
-    this._popDownload(video);
+    // Add to completed and 'cancel' the download.
     this.completed.push(video);
-    return util.exportVideo(video);
-  })
-  .then(() => {
+    video.torrent.cancelDownload();
     this.send(`${video.getTitle()} download complete!`);
+    // Cancel download to destroy the tfile.
     // Try to download the next item in this swiper's queue.
     this.downloadCount--;
     this._downloadFromQueue();
@@ -297,21 +305,29 @@ Swiper.prototype._downloadFromQueue = function(optCount) {
   });
 };
 
-Swiper.prototype.getCommands = function() {
-  let output = "\n";
-  for (let cmd in commands) {
-    let cmdInfo = commands[cmd];
-    if (!cmdInfo.isAlias) {
-      let arg = cmdInfo.arg ? ' <content>' : '';
-      let tab = ' '.repeat(23 - cmd.length - arg.length);
-      output += `${cmd}${arg}${tab}${cmdInfo.desc}\n`;
-    }
+Swiper.prototype.getCommands = function(optCommand) {
+  if (optCommand) {
+    return this._commandDetail(optCommand);
   }
-  output += `\nWhere <content> is one of:\n` +
-    `    <movie> (<year>)\n` +
-    `    <series> (<year>) (season <num>) (episode <num>)\n`;
-  output += `\nOn mismatch, try including the year.\n`;
+  let output = 'Commands:\n' + Object.keys(commands).filter(cmd => !commands[cmd].isAlias).join(', ') +
+    '\n\nType "help <command>" for details.';
   return output;
+};
+
+Swiper.prototype._commandDetail = function(cmd) {
+  let cmdInfo = commands[cmd];
+  if (!cmdInfo || cmdInfo.isAlias) {
+    return `${cmd} isn't something I respond to.`;
+  } else {
+    let arg = cmdInfo.arg ? ' ' + cmdInfo.arg : '';
+    let out = `${cmd}${arg}:  ${cmdInfo.desc}\n\n`;
+    if (cmdInfo.arg === '<content>') {
+      return out + `Where <content> is one of:\n` +
+        `    <movie> (<year>)\n` +
+        `    <series> (<year>) (season <num>) (episode <num>)\n`;
+    }
+    return out;
+  }
 };
 
 // Aborts the all current downloads if it was started in the last 60s.
@@ -327,10 +343,10 @@ Swiper.prototype.abort = function() {
 
 Swiper.prototype.remove = function(input) {
   return this._identifyContentFromInput(input)
-  .then(content => this._removeVideo(content));
+  .then(content => this._removeContent(content));
 };
 
-Swiper.prototype._removeVideo = function(video, ignoreDownloading, hidePrompts) {
+Swiper.prototype._removeContent = function(content, ignoreDownloading, hidePrompts) {
   let prompts = [];
   return this.dispatcher.readMemory()
   .then(memory => {
@@ -338,19 +354,20 @@ Swiper.prototype._removeVideo = function(video, ignoreDownloading, hidePrompts) 
     // Handle monitored and queued.
     for (let name in memory) {
       let queue = memory[name];
-      let memIsCandidate = queue.find(item => item.containsAny(video));
+      let memIsCandidate = queue.find(item => item.containsAny(content));
       if (memIsCandidate) {
-        prompts.push(this._confirmAction.bind(this, `Remove ${video.getTitle()} from ${name}?`,
-          () => this.dispatcher.updateMemory(this.id, name, 'remove', video), hidePrompts));
+        prompts.push(this._confirmAction.bind(this, `Remove ${content.getTitle()} from ${name}?`,
+          () => this.dispatcher.updateMemory(this.id, name, 'remove', content), hidePrompts));
       }
     }
     // Handle downloading.
     if (!ignoreDownloading) {
-      let dwnCancel = this.downloading.find(item => item.equals(video));
-      if (dwnCancel) {
-        prompts.push(this._confirmAction.bind(this, `Abort downloading ${video.getTitle()}?`,
-          () => this._cancelDownload(dwnCancel), hidePrompts));
-      }
+      this.downloading.forEach(video => {
+        if (content.containsAny(video)) {
+          prompts.push(this._confirmAction.bind(this, `Abort downloading ${video.getDesc()}?`,
+            () => this._cancelDownload(video), hidePrompts));
+        }
+      });
     }
     // Display the prompts one after the other.
     if (prompts.length > 0) {
@@ -358,7 +375,7 @@ Swiper.prototype._removeVideo = function(video, ignoreDownloading, hidePrompts) 
         return acc.then(() => prompt());
       }, Promise.resolve());
     } else {
-      return `${video.getTitle()} is not being monitored, queued or downloaded.`;
+      return `${content.getTitle()} is not being monitored, queued or downloaded.`;
     }
   });
 };

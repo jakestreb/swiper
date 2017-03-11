@@ -1,8 +1,10 @@
 'use strict';
 
+const Promise = require('bluebird');
 const path = require('path');
 const rimraf = require('rimraf');
 const settings = require('../util/settings.js');
+const rimrafAsync = Promise.promisify(rimraf);
 
 function Torrent(video, stats) {
   this.video = video;
@@ -12,7 +14,6 @@ function Torrent(video, stats) {
   this.leechers = stats.leechers;
   this.uploadDate = stats.uploadDate;
   this.magnetLink = stats.magnetLink;
-  this.isPaused = false;
   this.tfile = null;
 }
 
@@ -48,19 +49,21 @@ Torrent.prototype.getTier = function(type) {
 };
 
 Torrent.prototype.cancelDownload = function() {
-  this.tfile.destroy();
   this.tfile.files.map(file => {
-    let origPath = path.join(this.tfile.path, file.path);
-    rimraf(origPath);
+    let fileDir = file.path.split('/').shift();
+    let origPath = path.join(this.tfile.path, fileDir);
+    rimrafAsync(origPath).then(err => {
+      if (err) {
+        console.warn(err);
+      }
+    });
   });
+  this.tfile.destroy();
 };
 
 Torrent.prototype.getDownloadInfo = function() {
   if (!this.tfile) {
     return this.name + "\n";
-  } else if (this.isPaused) {
-    return this.name + "\n" +
-      "    Progress: " + (this.tfile.progress * 100).toPrecision(3) + "% (Paused)\n";
   } else {
     return this.name + "\n" +
       "    Peers: " + this.tfile.numPeers + "\n" +

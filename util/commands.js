@@ -2,7 +2,7 @@
 module.exports = {
   download: {
     func: 'download',
-    arg: true,
+    arg: '<content>',
     isAlias: false,
     aliases: ['get'],
     desc: "Downloads the best torrent for a show or movie."
@@ -13,16 +13,16 @@ module.exports = {
   },
   search: {
     func: 'search',
-    arg: true,
+    arg: '<content>',
     isAlias: false,
     desc: "Returns a list of torrents for a show or movie."
   },
   monitor: {
     func: 'monitor',
-    arg: true,
+    arg: '<content>',
     isAlias: false,
     aliases: ['watch'],
-    desc: "Adds an item to check on intermittently until it's found.\n"
+    desc: "Adds an item to check on intermittently until it's found."
   },
   watch: {
     func: 'monitor',
@@ -31,11 +31,11 @@ module.exports = {
   check: {
     func: 'check',
     isAlias: false,
-    desc: "Perform search for monitored items now.\n"
+    desc: "Perform search for monitored items now."
   },
   remove: {
     func: 'remove',
-    arg: true,
+    arg: '<content>',
     isAlias: false,
     aliases: ['delete'],
     desc: "Removes the given item from monitored, queued, or downloading."
@@ -47,7 +47,7 @@ module.exports = {
   },
   cancel: {
     isAlias: false,
-    desc: "Ends the current conversation.\n"
+    desc: "Ends the current conversation."
   },
   status: {
     func: 'getStatus',
@@ -66,8 +66,9 @@ module.exports = {
   help: {
     func: 'getCommands',
     isAlias: false,
+    arg: '(<command>)',
     aliases: ['commands'],
-    desc: "Returns the list of commands."
+    desc: "Returns the list of commands, or describes the given command."
   },
   commands: {
     func: 'getCommands',
