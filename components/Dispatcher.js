@@ -37,9 +37,12 @@ function Dispatcher(respondFuncs) {
 }
 
 Dispatcher.prototype.initFacebookSwipers = function() {
-  this.readMemory()
-  .then(memory => {
-    memory.swipers.forEach(id => {
+  return this.memoryLock.acquire('key', () => {
+    return readFile('util/memory.json', 'utf8');
+  })
+  .then(file => {
+    let fileObj = JSON.parse(file);
+    fileObj.swipers.forEach(id => {
       this.swipers[id] = new Swiper(this, id, this.respondFuncs.facebook);
     });
   });
