@@ -281,7 +281,7 @@ Swiper.prototype._startDownload = function(video) {
   .then(() => {
     // Add to completed and 'cancel' the download.
     this.completed.push(video);
-    video.torrent.cancelDownload();
+    this._cancelDownload(video);
     this.send(`${video.getTitle()} download complete!`);
     // Cancel download to destroy the tfile.
     // Try to download the next item in this swiper's queue.

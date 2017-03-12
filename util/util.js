@@ -8,7 +8,6 @@ const path = require('path');
 const rimraf = require('rimraf');
 const access = Promise.promisify(fs.access);
 const mkdir = Promise.promisify(fs.mkdir);
-const rename = Promise.promisify(fs.rename);
 const rimrafAsync = Promise.promisify(rimraf);
 
 const Movie = require('../components/Movie.js');
@@ -108,14 +107,13 @@ function exportVideo(video) {
       // console.warn('B', file.name);
       // console.warn('dwld path', origPath);
       // console.warn('final path', finalPath);
-      return rename(origPath, path.join(finalPath, file.name))
+      return copy(origPath, path.join(finalPath, file.name))
       .then(() => {
-        // If the file was located in a downloads subdirectory, return it.
-        let splitPath = file.path.split('/');
-        return splitPath.length > 1 ? splitPath[0] : null;
+        // Return the first download root subdirectory of each file for deletion.
+        return file.path.split('/').shift();
       })
       .catch(err => {
-        console.error('Failed to move downloaded file: ', err);
+        console.error('Failed to copy downloaded file: ', err);
       });
     }));
   })
@@ -123,7 +121,7 @@ function exportVideo(video) {
     let tfile = video.torrent.tfile;
     let tfilePath = video.torrent.tfile.path;
     tfile.destroy();
-    subDirs.filter(dir => dir).forEach(dir => {
+    subDirs.forEach(dir => {
       // Remove all file subdirectorys.
       rimrafAsync(path.join(tfilePath, dir)).then(err => {
         if (err) {
@@ -134,6 +132,24 @@ function exportVideo(video) {
   });
 }
 exports.exportVideo = exportVideo;
+
+// Copys a file from the src path to the dst path, returns a promise.
+function copy(src, dst) {
+  return new Promise((resolve, reject) => {
+    var rd = fs.createReadStream(src);
+    rd.on("error", err => {
+      reject(err);
+    });
+    var wr = fs.createWriteStream(dst);
+    wr.on("error", err => {
+      reject(err);
+    });
+    wr.on("close", ex => {
+      resolve();
+    });
+    rd.pipe(wr);
+  });
+}
 
 // Pad zeros to give a 2 digit string number.
 function padZeros(int) {
