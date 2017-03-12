@@ -22,7 +22,6 @@ function Swiper(dispatcher, id, fromSwiper) {
 
   this.torrentClient = dispatcher.torrentClient;
   this.downloading = dispatcher.downloading;
-  this.completed = dispatcher.completed;
 
   this.downloadCount = 0;  // Should be kept in-sync with num downloads with this id.
 
@@ -124,10 +123,7 @@ Swiper.prototype.getStatus = function() {
         .join("\n") || "None") + "\n\n" +
       "Downloading:\n" +
       (this.downloading.reduce((acc, val) =>
-        acc + indentFunc(val) + val.torrent.getDownloadInfo() + "\n", "") || "None\n") + "\n" +
-      "Completed:\n" +
-      (this.completed.reduce((acc, val) => acc + indentFunc(val) + val.getDesc() + "\n", "")
-        || "None\n");
+        acc + indentFunc(val) + val.torrent.getDownloadInfo() + "\n", "") || "None\n");
   });
 };
 
@@ -279,8 +275,7 @@ Swiper.prototype._startDownload = function(video) {
   this.torrentClient.download(video.torrent)
   .then(() => util.exportVideo(video))
   .then(() => {
-    // Add to completed and 'cancel' the download.
-    this.completed.push(video);
+    // Download and transfer complete, 'cancel' the download.
     this._cancelDownload(video);
     this.send(`${video.getTitle()} download complete!`);
     // Cancel download to destroy the tfile.
@@ -368,7 +363,7 @@ Swiper.prototype._removeContent = function(content, ignoreDownloading, hidePromp
       let queue = memory[name];
       let memIsCandidate = queue.find(item => item.containsAny(content));
       if (memIsCandidate) {
-        prompts.push(this._confirmAction.bind(this, `Remove ${content.getTitle()} from ${name}?`,
+        prompts.push(this._confirmAction.bind(this, `Remove ${content.getDesc()} from ${name}?`,
           () => this.dispatcher.updateMemory(this.id, name, 'remove', content), hidePrompts));
       }
     }
@@ -385,9 +380,10 @@ Swiper.prototype._removeContent = function(content, ignoreDownloading, hidePromp
     if (prompts.length > 0) {
       return prompts.reduce((acc, prompt) => {
         return acc.then(() => prompt());
-      }, Promise.resolve());
+      }, Promise.resolve())
+      .then(() => 'Removed.');
     } else {
-      return `${content.getTitle()} is not being monitored, queued or downloaded.`;
+      return `${content.getDesc()} is not being monitored, queued or downloaded.`;
     }
   });
 };

@@ -17,7 +17,6 @@ function Dispatcher(respondFuncs) {
   this.respondFuncs = respondFuncs;
   this.swipers = {};
   this.downloading = [];
-  this.completed = [];
 
   // Lock should be acquired before reading/writing memory.json
   this.memoryLock = new AsyncLock({
