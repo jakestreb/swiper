@@ -28,7 +28,7 @@ function longPoll() {
         let id = item.id;
         // Send the message to the dispatcher, which will route it to the correct Swiper.
         // Respond by POSTing to the gateway.
-        dispatcher.acceptMessage('facebook', `fb:${id}`, message);
+        dispatcher.acceptMessage('facebook', id, message);
       });
     }
   })
