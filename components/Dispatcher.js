@@ -153,12 +153,8 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
     .then(file => {
       let fileObj = JSON.parse(file);
       let t = this._parseContent(fileObj[target]);
-      // TODO: Remove
-      // console.warn('origArr', t);
       let finalArr = method === 'add' ? this._addToArray(swiperId, t, item) :
         this._removeFromArray(swiperId, t, item);
-      // TODO: Remove
-      // console.warn('finalArr', finalArr);
       fileObj[target] = t.map(item => item.getObject());
       if (finalArr) {
         return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2));
@@ -167,10 +163,9 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
       } else {
         return `${item.getTitle()} is not in ${target}`;
       }
-    });
-    // TODO: Uncomment.
-    // .catch(() => `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +
-    //   `${target}.` : `removing ${item.getTitle()} from ${target}.`}`);
+    })
+    .catch(() => `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +
+      `${target}.` : `removing ${item.getTitle()} from ${target}.`}`);
   });
 };
 

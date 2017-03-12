@@ -14,7 +14,6 @@ const commands = require('../util/commands.js');
 
 // TODO: Restart on all exceptions.
 // TODO: Create readme (heroku address, how to check ips, etc).
-// TODO: Clear all TODOs in the project.
 
 function Swiper(dispatcher, id, fromSwiper) {
   this.dispatcher = dispatcher;
@@ -277,17 +276,18 @@ Swiper.prototype._startDownload = function(video) {
   .then(() => {
     // Download and transfer complete, 'cancel' the download.
     this._cancelDownload(video);
-    this.send(`${video.getTitle()} download complete!`);
+    this.send(`${video.getDesc()} download complete!`);
     // Cancel download to destroy the tfile.
     // Try to download the next item in this swiper's queue.
     this.downloadCount--;
     this._downloadFromQueue();
+  })
+  .catch(() => {
+    this.send(`${video.getDesc()} download process died, restarting download.`);
+    // Destroy the tfile, since it will be re-set.
+    video.torrent.tfile.destroy();
+    this._startDownload(video);
   });
-  // TODO: Uncomment
-  // .catch(() => {
-  //   this.send(`${video.title} download process died, restarting download.`);
-  //   this._startDownload(video);
-  // });
 };
 
 // optCount gives the number of VIDEOS in the queue to attempt downloading.
