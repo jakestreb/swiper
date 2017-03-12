@@ -3,7 +3,7 @@
 const WebTorrent = require('webtorrent');
 const path = require('path');
 
-const downloadDir = path.resolve(__dirname, '../downloads');
+const downloadDir = process.env.DOWNLOAD_ROOT || path.resolve(__dirname, '../downloads');
 
 function TorrentClient(optErrorCallback) {
   this.client = null;
@@ -27,7 +27,6 @@ TorrentClient.prototype.download = function(torrent) {
       torrent.setProgressFile(tfile);
       tfile.once('done', () => { resolve(torrent); });
       tfile.once('error', () => { reject(torrent); });
-      console.warn('EVENTS', tfile.eventNames());
     });
   });
 };

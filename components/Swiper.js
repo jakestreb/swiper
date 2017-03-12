@@ -37,7 +37,7 @@ function Swiper(dispatcher, id, fromSwiper) {
 }
 
 Swiper.prototype.send = function(message) {
-  return this.fromSwiper(message);
+  return this.fromSwiper(message, this.id);
 };
 
 // If given a message, sends it before waiting for input
@@ -91,6 +91,11 @@ Swiper.prototype.awaitCommand = function(message) {
   .then(doneStr => this.awaitCommand(doneStr || 'Got it.'))
   .catch(InputError, e => {
     this.send(e.message);
+    return this.awaitCommand();
+  })
+  .catch(e => {
+    console.error(e);
+    this.send('Something went wrong. What do you need?');
     return this.awaitCommand();
   });
 };
@@ -401,8 +406,14 @@ Swiper.prototype.search = function(input) {
       return `I don't have a good connection right now. Try again in a few minutes.`;
     } else {
       return this._identifyContentFromInput(input)
-      .then(content => content.isVideo() ? this._searchVideo(content) :
-        this._resolveSearchToEpisode(content));
+      .then(content => {
+        if (content.isVideo()) {
+          return this._searchVideo(content);
+        } else {
+          return this._resolveSearchToEpisode(content)
+          .then(video => this._searchVideo(video));
+        }
+      });
     }
   });
 };
@@ -525,7 +536,7 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
     responses.push(resp.next);
   }
   return this.awaitResponse(`Found torrents:\n` +
-    `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1}.` + t.toString(), "")}` +
+    `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1}. ` + t.toString(), "")}` +
     `Type ${prev ? '"prev", ' : ""}${next ? '"next", ' : ""}or "download" followed ` +
     `by the number of the torrent you'd like.`, responses)
   .then(resp => {

@@ -18,18 +18,6 @@ rimrafAsync('./downloads/*').then(err => {
   }
 });
 
-// For now, start the Dispatcher and listen on the command line.
-let dispatcher = new Dispatcher();
-
-// Initialize command line Swiper.
-process.stdin.resume();
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', text => {
-  // Resolve with the text minus /r/n
-  dispatcher.acceptMessage('cli', text.trim(), message => { console.log(message); });
-});
-
-// Start long polling the gateway for Facebook messages.
 function longPoll() {
   return gatewayGet()
   .then(resp => {
@@ -40,8 +28,7 @@ function longPoll() {
         let id = item.id;
         // Send the message to the dispatcher, which will route it to the correct Swiper.
         // Respond by POSTing to the gateway.
-        dispatcher.acceptMessage(`fb:${id}`, message, msg =>
-          gatewayPost({ id: id, message: msg }));
+        dispatcher.acceptMessage('facebook', `fb:${id}`, message);
       });
     }
   })
@@ -50,7 +37,7 @@ function longPoll() {
   })
   .then(() => longPoll());
 }
-longPoll();
+
 
 // GET request to gateway.
 function gatewayGet() {
@@ -69,3 +56,20 @@ function gatewayPost(json) {
     json: json
   });
 }
+
+// For now, start the Dispatcher and listen on the command line.
+let dispatcher = new Dispatcher({
+  cli: (msg, id) => { console.log(msg); },
+  facebook: (msg, id) => { gatewayPost({ id: id, message: msg }); }
+});
+
+// Initialize command line Swiper.
+process.stdin.resume();
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', text => {
+  // Resolve with the text minus /r/n
+  dispatcher.acceptMessage('cli', 'cli', text.trim());
+});
+
+// Start long polling the gateway for Facebook messages.
+longPoll();

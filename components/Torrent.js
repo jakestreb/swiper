@@ -75,10 +75,10 @@ Torrent.prototype.getDownloadInfo = function() {
 
 Torrent.prototype.toString = function() {
   return this.name + "\n" +
-    "  Size: " + this.size + " Mb\n" +
-    "  SE: " + this.seeders + "\n" +
-    "  LE: " + this.leechers + "\n" +
-    "  Uploaded: " + this.uploadDate + "\n";
+    "    Size: " + this.size + " Mb\n" +
+    "    SE: " + this.seeders + "\n" +
+    "    LE: " + this.leechers + "\n" +
+    "    Uploaded: " + this.uploadDate + "\n";
 };
 
 // Expects a string which starts with a decimal number and either GiB, MiB, or kiB

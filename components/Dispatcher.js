@@ -13,7 +13,8 @@ const Episode = require('./Episode.js');
 const Collection = require('./Collection.js');
 const settings = require('../util/settings.js');
 
-function Dispatcher() {
+function Dispatcher(respondFuncs) {
+  this.respondFuncs = respondFuncs;
   this.swipers = {};
   this.downloading = [];
   this.completed = [];
@@ -28,17 +29,33 @@ function Dispatcher() {
     // TODO: Restart all the downloads that were in progess, and tell the users.
   });
 
+  // Create established Facebook swipers.
+  this.initFacebookSwipers();
+
   // Start monitoring items.
   this.startMonitoring();
 }
 
+Dispatcher.prototype.initFacebookSwipers = function() {
+  this.readMemory()
+  .then(memory => {
+    memory.swipers.forEach(id => {
+      this.swipers[id] = new Swiper(this, id, this.respondFuncs.facebook);
+    });
+  });
+};
+
 // Sends a message to the swiper with id, or creates a new swiper if it does not exist.
-Dispatcher.prototype.acceptMessage = function(id, message, fromSwiper) {
-  if (this.swipers[id]) {
+Dispatcher.prototype.acceptMessage = function(type, id, message) {
+  let swiper = this.swipers[id];
+  if (swiper) {
     this.swipers[id].toSwiper(message);
   } else {
     // New swiper
-    this.swipers[id] = new Swiper(this, id, fromSwiper);
+    this.swipers[id] = new Swiper(this, id, this.respondFuncs[type]);
+    if (type === 'facebook') {
+      this.saveSwiper(id);
+    }
   }
   // console.warn('ACCEPTED MESSAGE', message);
   // console.warn('id', id);
@@ -100,6 +117,17 @@ Dispatcher.prototype.readMemory = function() {
     return readFile('util/memory.json', 'utf8');
   })
   .then(file => this._parseFile(file));
+};
+
+Dispatcher.prototype.saveSwiper = function(id) {
+  return this.memoryLock.acquire('key', () => {
+    return readFile('util/memory.json', 'utf8')
+    .then(file => this._parseFile(file))
+    .then(memory => {
+      memory.swipers.push(id);
+      return writeFile('util/memory.json', JSON.stringify(memory, null, 2));
+    });
+  });
 };
 
 Dispatcher.prototype._parseFile = function(file) {
