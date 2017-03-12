@@ -37,7 +37,6 @@ function Swiper(dispatcher, id, fromSwiper) {
 }
 
 Swiper.prototype.send = function(message) {
-  console.log('Posting message: ' + message);
   return this.fromSwiper(message, this.id);
 };
 
@@ -213,14 +212,14 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
   } else if (addCount === 0) {
     queueItem = content;
   }
-  Promise.try(() => queueItem ?
+  return Promise.try(() => queueItem ?
     this.dispatcher.updateMemory(this.id, 'queued', 'add', queueItem) : null)
   .then(() => {
-    ready.forEach(video => {
+    return Promise.all(ready.map(video => {
       if (video.torrent) {
-        this._startDownload(video);
+        return this._startDownload(video, noPrompt);
       } else {
-        this._resolveVideoDownload(video, noPrompt)
+        return this._resolveVideoDownload(video, noPrompt)
         .then(success => {
           if (noPrompt && !success) {
             // Monitor failures.
@@ -230,7 +229,9 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
           }
         });
       }
-    });
+    }))
+    .then(() => noPrompt || `Download${ready.length > 1 ? 's' : ''} started. Type "abort" to ` +
+      `stop, or "status" to view progess.`);
   });
 };
 
@@ -272,7 +273,6 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
 
 Swiper.prototype._startDownload = function(video) {
   // Remove the video from monitoring and queueing, if it was in those places.
-  this.send(`Downloading ${video.getDesc()}.`);
   this._removeContent(video, true, true);
   this.downloading.push(video);
   this.downloadCount++;
@@ -293,8 +293,6 @@ Swiper.prototype._startDownload = function(video) {
   //   this.send(`${video.title} download process died, restarting download.`);
   //   this._startDownload(video);
   // });
-  return `Downloading: \n${video.torrent.toString()}\nType "abort" to stop the download, or ` +
-    `"status" to view progess. Is there anything else you need?`;
 };
 
 // optCount gives the number of VIDEOS in the queue to attempt downloading.

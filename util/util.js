@@ -58,8 +58,11 @@ function torrentSearch(video, optRetryCount) {
     sortBy: 'desc'
   })
   .then(results => {
-    if (!results) {
-      return optRetryCount > 0 ? torrentSearch(video.getSearchTerm(), optRetryCount - 1) : [];
+    if (results.length === 0) {
+      if (optRetryCount > 0) {
+        return Promise.delay(100).then(() => torrentSearch(video, optRetryCount - 1));
+      }
+      return [];
     } else {
       return results.map(result =>
         new Torrent(video, {

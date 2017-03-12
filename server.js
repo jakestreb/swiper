@@ -21,7 +21,7 @@ rimrafAsync('./downloads/*').then(err => {
 function longPoll() {
   return gatewayGet()
   .then(resp => {
-    console.log('Received messages from the gateway: ' + resp);
+    // console.log('Received messages from the gateway: ' + resp);
     let data = JSON.parse(resp);
     if (data.messages) {
       data.messages.forEach(item => {
@@ -34,7 +34,7 @@ function longPoll() {
     }
   })
   .catch(err => {
-    console.warn('Request for messages failed:' , err.message);
+    // console.warn('Request for messages failed:' , err.message);
   })
   .then(() => longPoll());
 }
@@ -42,7 +42,7 @@ function longPoll() {
 
 // GET request to gateway.
 function gatewayGet() {
-  console.log('Requesting messages from the gateway: ' + new Date());
+  // console.log('Requesting messages from the gateway: ' + new Date());
   return rp({
     url: gatewayUrl,
     method: 'GET',
@@ -52,7 +52,7 @@ function gatewayGet() {
 
 // POST request to gateway.
 function gatewayPost(json) {
-  console.log('Posting messages to gateway: ' + new Date());
+  // console.log('Posting messages to gateway: ' + new Date());
   return rp({
     url: gatewayUrl,
     method: 'POST',
