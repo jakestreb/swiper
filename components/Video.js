@@ -18,6 +18,11 @@ Video.prototype.getTitle = function() {
   return this.title;
 };
 
+// Returns a title that is safe to name a directory after.
+Video.prototype.getSafeTitle = function() {
+  return this.title.replace(/[\/\\\:\*\?\"\<\>\|]/g, '');
+};
+
 Video.prototype.getType = function() {
   return this.type;
 };

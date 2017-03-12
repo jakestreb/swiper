@@ -79,7 +79,7 @@ exports.torrentSearch = torrentSearch;
 // Save a video in the correct directory, adding any necessary directories.
 function exportVideo(video) {
   let dirs = video.getType() === 'movie' ? ['movies'] :
-    ['tv', video.getTitle(), `Season ${video.seasonNum}`];
+    ['tv', video.getSafeTitle(), `Season ${video.seasonNum}`];
   // TODO: remove
   // console.warn('dirs', dirs);
   // console.warn('rootDir', rootDir);
