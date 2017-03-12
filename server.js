@@ -34,7 +34,7 @@ function longPoll() {
     }
   })
   .catch(err => {
-    // console.warn('err', err);
+    console.warn('Request for messages failed:' , err);
   })
   .then(() => longPoll());
 }
