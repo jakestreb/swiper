@@ -37,6 +37,7 @@ function Swiper(dispatcher, id, fromSwiper) {
 }
 
 Swiper.prototype.send = function(message) {
+  console.log('Posting message: ' + message);
   return this.fromSwiper(message, this.id);
 };
 
@@ -271,7 +272,7 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
 
 Swiper.prototype._startDownload = function(video) {
   // Remove the video from monitoring and queueing, if it was in those places.
-  this.send(`Downloading ${video.getDesc()}...`);
+  this.send(`Downloading ${video.getDesc()}.`);
   this._removeContent(video, true, true);
   this.downloading.push(video);
   this.downloadCount++;
