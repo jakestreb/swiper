@@ -33,7 +33,7 @@ function Swiper(dispatcher, id, fromSwiper) {
   // Immediately start downloading any items from the queue.
   this._downloadFromQueue(settings.maxDownloads);
 
-  this.awaitCommand(`I'm Swiper. Type "help" to see what I can do.`);
+  this.awaitCommand();
 }
 
 Swiper.prototype.send = function(message) {
