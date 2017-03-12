@@ -88,7 +88,7 @@ Swiper.prototype._awaitResponse = function(message, possible, callCount) {
 Swiper.prototype.awaitCommand = function(message) {
   return this.awaitInput(message)
   .then(input => this.parseCommand(input))
-  .then(doneStr => this.awaitCommand(doneStr || 'Got it.'))
+  .then(doneStr => this.awaitCommand(doneStr))
   .catch(InputError, e => {
     this.send(e.message);
     return this.awaitCommand();
@@ -238,10 +238,18 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
 // Sets the torrent for a video and downloads it.
 Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
   noPrompt ? null : this.send(`Looking for ${video.getTitle()} downloads...`);
-  return util.torrentSearch(video, 2)
+  return util.torrentSearch(video, 3)
   .then(torrents => {
     let best = this._autoPickTorrent(torrents, video.getType());
-    if (!best) {
+    if (torrents.length === 0) {
+      return noPrompt ? false : this.awaitResponse(`I can't find any torrents right now. ` +
+        `Would you like me to try again? Otherwise, type "monitor" and I'll keep an eye out ` +
+        `for ${video.getDesc()}`, [resp.monitor, resp.yes, resp.no])
+        .then(resp => {
+          return resp.match === 'yes' ? this._resolveVideoDownload(video) :
+            this._monitorContent(video);
+        });
+    } else if (!best) {
       return noPrompt ? false : this.awaitResponse(`I can't find a good torrent. If you'd like ` +
         `to see the results for yourself, type "search", otherwise type "monitor" and I'll ` +
         `keep an eye out for ${video.getTitle()}`, [resp.search, resp.monitor])
@@ -263,6 +271,7 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
 
 Swiper.prototype._startDownload = function(video) {
   // Remove the video from monitoring and queueing, if it was in those places.
+  this.send(`Downloading ${video.getDesc()}...`);
   this._removeContent(video, true, true);
   this.downloading.push(video);
   this.downloadCount++;
@@ -403,7 +412,7 @@ Swiper.prototype._cancelDownload = function(video) {
 Swiper.prototype.search = function(input) {
   return isOnline().then(online => {
     if (!online) {
-      return `I don't have a good connection right now. Try again in a few minutes.`;
+      return `I don't have a good internet connection right now. Try again in a few minutes.`;
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
@@ -419,15 +428,18 @@ Swiper.prototype.search = function(input) {
 };
 
 Swiper.prototype._searchVideo = function(video) {
-  return util.torrentSearch(video, 2)
+  return util.torrentSearch(video, 3)
   .then(torrents => {
     if (torrents.length > 0) {
       return this._showTorrents(video, torrents);
     } else {
-      return this.awaitResponse("I can't connect to PirateBay right now. Would you like me to " +
-        "keep an eye out for it?", [resp.yes, resp.no])
+      return this.awaitResponse(`I can't find any torrents right now. Would you like me to ` +
+        `try again? Otherwise type "monitor" and I'll keep an eye out for ${video.getDesc()}.`,
+        [resp.monitor, resp.yes, resp.no])
       .then(feedback => {
         if (feedback.match === 'yes') {
+          return this._searchVideo(video);
+        } else if (feedback.match === 'monitor') {
           this._monitorContent(video);
         }
         return "Ok";
