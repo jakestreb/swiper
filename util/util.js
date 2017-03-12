@@ -110,6 +110,9 @@ function exportVideo(video) {
         // If the file was located in a downloads subdirectory, return it.
         let splitPath = file.path.split('/');
         return splitPath.length > 1 ? splitPath[0] : null;
+      })
+      .catch(err => {
+        console.error('Failed to move downloaded file: ', err);
       });
     }));
   })
