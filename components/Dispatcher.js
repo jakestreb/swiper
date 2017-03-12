@@ -116,27 +116,28 @@ Dispatcher.prototype.readMemory = function() {
   return this.memoryLock.acquire('key', () => {
     return readFile('util/memory.json', 'utf8');
   })
-  .then(file => this._parseFile(file));
+  .then(file => {
+    let fileObj = JSON.parse(file);
+    return {
+      monitored: this._parseContent(fileObj.monitored),
+      queued: this._parseContent(fileObj.queued)
+    };
+  });
 };
 
 Dispatcher.prototype.saveSwiper = function(id) {
   return this.memoryLock.acquire('key', () => {
     return readFile('util/memory.json', 'utf8')
-    .then(file => this._parseFile(file))
-    .then(memory => {
-      memory.swipers.push(id);
-      return writeFile('util/memory.json', JSON.stringify(memory, null, 2));
+    .then(file => {
+      let fileObj = JSON.parse(file);
+      fileObj.swipers.push(id);
+      return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2));
     });
   });
 };
 
-Dispatcher.prototype._parseFile = function(file) {
-  let data = JSON.parse(file);
-  for (let key in data) {
-    // Create classes from the objectified stored items.
-    data[key] = data[key].map(item => _objToContent(item));
-  }
-  return data;
+Dispatcher.prototype._parseContent = function(arr) {
+  return arr.map(item => _objToContent(item));
 };
 
 /**
@@ -147,18 +148,18 @@ Dispatcher.prototype._parseFile = function(file) {
 Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
   return this.memoryLock.acquire('key', () => {
     return readFile('util/memory.json', 'utf8')
-    .then(file => this._parseFile(file))
-    .then(memory => {
-      let t = memory[target];
+    .then(file => {
+      let fileObj = JSON.parse(file);
+      let t = this._parseContent(fileObj[target]);
       // TODO: Remove
       // console.warn('origArr', t);
       let finalArr = method === 'add' ? this._addToArray(swiperId, t, item) :
         this._removeFromArray(swiperId, t, item);
       // TODO: Remove
       // console.warn('finalArr', finalArr);
-      memory[target] = finalArr;
+      fileObj[target] = t.map(item => item.getObject());
       if (finalArr) {
-        return writeFile('util/memory.json', JSON.stringify(memory, null, 2));
+        return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2));
       } else if (method === 'add') {
         return `${item.getTitle()} is already ${target}`;
       } else {
