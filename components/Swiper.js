@@ -46,7 +46,7 @@ Swiper.prototype.awaitInput = function(optMessage) {
   return new Promise((resolve, reject) => {
     this.toSwiper = resolve;
   })
-  .then(input => input === 'cancel' ?
+  .then(input => input.toLowerCase() === 'cancel' ?
     this.awaitCommand('Ok, nevermind. Need anything else?') : input
   );
 };
@@ -185,7 +185,7 @@ Swiper.prototype.download = function(input) {
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
-        return this.queueDownload(content, !content.isVideo());
+        return this.queueDownload(content);
       });
     }
   });
@@ -212,13 +212,15 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
   .then(() => {
     return Promise.all(ready.map(video => {
       if (video.torrent) {
-        return this._startDownload(video, noPrompt);
+        return this._startDownload(video, noPrompt || !content.isVideo());
       } else {
-        return this._resolveVideoDownload(video, noPrompt)
+        return this._resolveVideoDownload(video, noPrompt || !content.isVideo())
         .then(success => {
-          if (noPrompt && !success) {
-            // Monitor failures.
-            this.send(`Failed to find ${video.getDesc()}, adding to monitored.`);
+          if (!content.isVideo() && !success) {
+            // For collection download requests, monitor failures.
+            if (!noPrompt) {
+              this.send(`Failed to find ${video.getDesc()}, adding to monitored.`);
+            }
             this._monitorContent(video);
             this._downloadFromQueue();
           }
@@ -337,7 +339,7 @@ Swiper.prototype._commandDetail = function(cmd) {
   }
 };
 
-// Aborts the all current downloads if it was started in the last 60s.
+// Aborts the all current downloads.
 Swiper.prototype.abort = function() {
   this.downloading.filter(video => video.swiperId === this.id).forEach(video => {
     this._popDownload(video);
@@ -346,6 +348,7 @@ Swiper.prototype.abort = function() {
   this.downloadCount = 0;
   // Download the next things in the queue.
   this._downloadFromQueue(settings.maxDownload);
+  return 'Aborted current downloads.';
 };
 
 Swiper.prototype.remove = function(input) {
@@ -469,7 +472,7 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
     [isSeries ? resp.seasonOrEpisode : resp.episode, resp.download]
   ).then(feedback => {
     if (feedback.match === 'download') {
-      this.queueDownload(collection, true);
+      this.queueDownload(collection);
     } else if (isSeries) {
       let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
