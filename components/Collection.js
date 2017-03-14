@@ -97,6 +97,8 @@ Collection.prototype.isEmpty = function() {
   return this.episodes.length === 0;
 };
 
+// Gives episodes in the following format:
+// S01E01-12, S02E01-04 & E06-08, S04E10
 Collection.prototype.getDesc = function() {
   let epDesc = "";
   let epChain = 0;
@@ -107,7 +109,7 @@ Collection.prototype.getDesc = function() {
       epDesc += `S${ep.getPaddedSeason()}E${ep.getPaddedEpisode()}`;
     } else if (ep.seasonNum > lastSeason) {
       // New season
-      epDesc += `, S${ep.getPaddedSeason()}E${ep.getPaddedEpisode()}`;
+      epDesc += `-${util.padZeros(lastEpisode)}, S${ep.getPaddedSeason()}E${ep.getPaddedEpisode()}`;
       epChain = 0;
     } else if (ep.seasonNum === lastSeason && (ep.episodeNum > lastEpisode + 1)) {
       // Same season, later episode
@@ -125,8 +127,6 @@ Collection.prototype.getDesc = function() {
   });
   return `${this.title} ${epDesc}`;
 };
-
-// S01E01-12, S02E01-04 & 06-08, S04E10
 
 Collection.prototype.getObject = function() {
   return {
