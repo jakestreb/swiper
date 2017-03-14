@@ -3,6 +3,7 @@
 const Promise = require('bluebird');
 const path = require('path');
 const rimraf = require('rimraf');
+const ptn = require('parse-torrent-name');
 const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const rimrafAsync = Promise.promisify(rimraf);
@@ -16,6 +17,8 @@ function Torrent(video, stats) {
   this.uploadTime = stats.uploadTime; // Note: Named uploadTime because it's not a date.
   this.magnetLink = stats.magnetLink;
   this.tfile = null;
+  // TODO: Used parsed data for more accurate quality selection.
+  this.parsed = ptn(this.name);
 }
 
 Torrent.prototype.getName = function() {
@@ -41,8 +44,12 @@ Torrent.prototype.getTier = function(type) {
   if (qIndex === -1) {
     return 0;
   }
-  if (this.video.type === 'episode' && this.video.releaseDate > util.getTomorrowMorning()) {
-    // If its a TV episode that hasn't been released, it's no good.
+  // If its a TV episode that hasn't been released, it's no good.
+  let unreleasedEpisode = this.video.type === 'episode' &&
+    this.video.releaseDate > util.getTomorrowMorning();
+  // If it's not the right video, it's no good.
+  let wrongTitle = this.parsed.title !== this.video.title;
+  if (unreleasedEpisode || wrongTitle) {
     return 0;
   }
   let size = this.size >= settings.size[type].min && this.size <= settings.size[type].max;

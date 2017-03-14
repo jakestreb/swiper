@@ -13,6 +13,7 @@
     "dotenv": "^4.0.0",
     "imdb-api": "^2.2.1",
     "is-online": "^6.1.0",
+    "parse-torrent-name": "^0.5.4",
     "request": "^2.80.0",
     "request-promise": "^4.1.1",
     "rimraf": "^2.6.1",
