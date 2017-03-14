@@ -69,7 +69,7 @@ function torrentSearch(video, optRetryCount) {
           size: result.size,
           seeders: result.seeders,
           leechers: result.leechers,
-          uploadDate: result.uploadDate,
+          uploadTime: result.uploadDate,
           magnetLink: result.magnetLink
         })
       );
@@ -156,3 +156,22 @@ function padZeros(int) {
   return ('00' + int).slice(-2);
 }
 exports.padZeros = padZeros;
+
+function getMorning() {
+  let morn = new Date();
+  morn.setHours(0);
+  morn.setMinutes(0);
+  morn.setSeconds(0);
+  return morn;
+}
+exports.getMorning = getMorning;
+
+function getTomorrowMorning() {
+  let morn = new Date();
+  morn.setHours(0);
+  morn.setMinutes(0);
+  morn.setSeconds(0);
+  morn.setDate(morn.getDate() + 1);
+  return morn;
+}
+exports.getTomorrowMorning = getTomorrowMorning;

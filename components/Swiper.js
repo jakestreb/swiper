@@ -165,17 +165,16 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
       }
     } else {
       // New
-      let now = new Date();
-      series.filterEpisodes(ep => ep.releaseDate > now);
+      series.filterEpisodes(ep => ep.releaseDate > util.getMorning());
       return this.dispatcher.updateMemory(this.id, 'monitored', 'add', series);
     }
-  });
+  })
+  .then(() => 'Added to monitored. Type "status" to show monitored.');
 };
 
 Swiper.prototype.check = function() {
-  this.send('Searching for monitored content...');
   return this.dispatcher.searchMonitored()
-  .then(() => 'Done searching.');
+  .then(() => 'Search in progress.');
 };
 
 Swiper.prototype.download = function(input) {
