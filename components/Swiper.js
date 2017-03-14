@@ -132,12 +132,14 @@ Swiper.prototype.monitor = function(input) {
 };
 
 Swiper.prototype._monitorContent = function(content) {
-  if (!content.isVideo()) {
-    return content.getInitialType() === 'series' ? this._resolveMonitorSeries(content) :
-      this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
-  } else {
-    return this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
-  }
+  return Promise.try(() => {
+    if (!content.isVideo()) {
+      return content.getInitialType() === 'series' ? this._resolveMonitorSeries(content) :
+        this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
+    } else {
+      return this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
+    }
+  }).then(() => 'Added to monitored. Type "status" to show monitored.');
 };
 
 Swiper.prototype._resolveMonitorSeries = function(series) {
@@ -153,6 +155,7 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
       let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
       if (!season) {
+        this.send(`I don't understand. Try something like "season 1" or "s1 e2".`);
         return this._resolveMonitorSeries(series);
       } else if (season && !episode) {
         // All season
@@ -168,8 +171,7 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
       series.filterEpisodes(ep => ep.releaseDate > util.getMorning());
       return this.dispatcher.updateMemory(this.id, 'monitored', 'add', series);
     }
-  })
-  .then(() => 'Added to monitored. Type "status" to show monitored.');
+  });
 };
 
 Swiper.prototype.check = function() {
@@ -225,9 +227,7 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
           }
         });
       }
-    }))
-    .then(() => noPrompt || `Download${ready.length > 1 ? 's' : ''} started. Type "abort" to ` +
-      `stop, or "status" to view progess.`);
+    }));
   });
 };
 
@@ -258,17 +258,20 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
     } else {
       video.setTorrent(best);
       if (noPrompt) {
-        this._startDownload(video);
+        this._startDownload(video, noPrompt);
         return true;
       } else {
-        return this._startDownload(video);
+        return this._startDownload(video, noPrompt);
       }
     }
   });
 };
 
-Swiper.prototype._startDownload = function(video) {
+Swiper.prototype._startDownload = function(video, noPrompt) {
   // Remove the video from monitoring and queueing, if it was in those places.
+  if (!noPrompt) {
+    this.send(`Download starting. Type "abort" to stop, or "status" to view progess.`);
+  }
   this._removeContent(video, true, true);
   this.downloading.push(video);
   this.downloadCount++;
@@ -287,7 +290,7 @@ Swiper.prototype._startDownload = function(video) {
     this.send(`${video.getDesc()} download process died, restarting download.`);
     // Destroy the tfile, since it will be re-set.
     video.torrent.tfile.destroy();
-    this._startDownload(video);
+    this._startDownload(video, noPrompt);
   });
 };
 

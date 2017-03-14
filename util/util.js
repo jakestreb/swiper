@@ -161,7 +161,7 @@ function getMorning() {
   let morn = new Date();
   morn.setHours(0);
   morn.setMinutes(0);
-  morn.setSeconds(0);
+  morn.setSeconds(0, 0);
   return morn;
 }
 exports.getMorning = getMorning;
@@ -170,7 +170,7 @@ function getTomorrowMorning() {
   let morn = new Date();
   morn.setHours(0);
   morn.setMinutes(0);
-  morn.setSeconds(0);
+  morn.setSeconds(0, 0);
   morn.setDate(morn.getDate() + 1);
   return morn;
 }
