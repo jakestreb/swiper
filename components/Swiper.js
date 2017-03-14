@@ -139,7 +139,7 @@ Swiper.prototype._monitorContent = function(content) {
     } else {
       return this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
     }
-  }).then(() => 'Added to monitored. Type "status" to show monitored.');
+  });
 };
 
 Swiper.prototype._resolveMonitorSeries = function(series) {
