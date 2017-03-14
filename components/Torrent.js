@@ -48,7 +48,7 @@ Torrent.prototype.getTier = function(type) {
   let unreleasedEpisode = this.video.type === 'episode' &&
     this.video.releaseDate >= util.getTomorrowMorning();
   // If it's not the right video, it's no good.
-  let wrongTitle = this.parsed.title !== this.video.title;
+  let wrongTitle = this.parsed.title !== this.video.getSafeTitle();
   if (unreleasedEpisode || wrongTitle) {
     return 0;
   }
