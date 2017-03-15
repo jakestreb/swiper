@@ -7,6 +7,8 @@ const util = require('../util/util.js');
 // A collection of episodes
 function Collection(swiperId, title, episodes, optInitialType, optInitialSeason) {
   Content.call(this, swiperId, title, 'collection');
+
+  // Invariant: Episodes are in order.
   this.episodes = episodes;
 
   // These are helpers indicating only the origins of the collection.
@@ -32,6 +34,13 @@ Collection.prototype.hasSeason = function(seasonNum) {
 
 Collection.prototype.getEpisode = function(seasonNum, episodeNum) {
   return this.episodes.find(ep => ep.seasonNum === seasonNum && ep.episodeNum === episodeNum);
+};
+
+Collection.prototype.getNextAirs = function() {
+  let morning = util.getMorning();
+  let leastOld = this.episodes.slice().reverse().find(ep => ep.releaseDate < morning);
+  let leastNew = this.episodes.find(ep => ep.releaseDate >= morning);
+  return util.getAiredString((leastNew || leastOld).releaseDate);
 };
 
 Collection.prototype.getInitialType = function() {

@@ -3,7 +3,7 @@
 module.exports = {
   quality: {
     episode: [/720p/gi, /1080p/gi, /HD(?!CAM)/gi], // keyword preference order
-    movie: [/1080p/gi, /720p/gi, /HD(?!CAM)/gi]
+    movie: [/1080p/gi, /720p/gi]
   },
   size: {
     episode: {

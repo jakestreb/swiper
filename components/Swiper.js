@@ -115,8 +115,10 @@ Swiper.prototype.getStatus = function() {
   return this.dispatcher.readMemory()
   .then(memory => {
     return "\nMonitoring:\n" +
-      (memory.monitored.map(item => indentFunc(item) + item.getDesc())
-        .join("\n") || "None") + "\n\n" +
+      (memory.monitored.map(item => {
+        return indentFunc(item) + item.getDesc() +
+          (item.type === 'collection' ? `  (${item.getNextAirs()})` : '');
+      }).join("\n") || "None") + "\n\n" +
       "Queued:\n" +
       (memory.queued.map(item => indentFunc(item) + item.getDesc())
         .join("\n") || "None") + "\n\n" +

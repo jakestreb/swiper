@@ -175,3 +175,35 @@ function getTomorrowMorning() {
   return morn;
 }
 exports.getTomorrowMorning = getTomorrowMorning;
+
+function getAiredString(date) {
+  let oneDay = 86400000;
+  let oneWeek = 7 * oneDay;
+  let weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  let months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+    'September', 'October', 'November', 'December'];
+  let weekday = weekdays[date.getDay()];
+  let month = months[date.getMonth()];
+  let calDay = date.getDate();
+  let diff = date.getTime() - getMorning().getTime();
+  if (diff < -oneWeek) {
+    // Over a week ago
+    return `Aired ${weekday}, ${month} ${calDay}`;
+  } else if (diff >= -oneWeek && diff < -oneDay) {
+    // In the week
+    return `Aired ${weekday}`;
+  } else if (diff >= -oneDay && diff < 0) {
+    // Yesterday
+    return `Aired yesterday`;
+  } else if (diff >= 0 && diff < oneDay) {
+    // Today
+    return `Airs today`;
+  } else if (diff >= oneDay && diff < oneWeek) {
+    // In the next week
+    return `Airs ${weekday}`;
+  } else {
+    // More than a week ahead
+    return `Airs ${weekday}, ${month} ${calDay}`;
+  }
+}
+exports.getAiredString = getAiredString;
