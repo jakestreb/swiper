@@ -178,6 +178,7 @@ exports.getTomorrowMorning = getTomorrowMorning;
 
 function getAiredString(date) {
   let oneDay = 86400000;
+  let twoDays = 2 * oneDay;
   let oneWeek = 7 * oneDay;
   let weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   let months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
@@ -189,16 +190,16 @@ function getAiredString(date) {
   if (diff < -oneWeek) {
     // Over a week ago
     return `Aired ${weekday}, ${month} ${calDay}`;
-  } else if (diff >= -oneWeek && diff < -oneDay) {
+  } else if (diff < -oneDay) {
     // In the week
     return `Aired ${weekday}`;
-  } else if (diff >= -oneDay && diff < 0) {
-    // Yesterday
+  } else if (diff < 0) {
     return `Aired yesterday`;
-  } else if (diff >= 0 && diff < oneDay) {
-    // Today
+  } else if (diff < oneDay) {
     return `Airs today`;
-  } else if (diff >= oneDay && diff < oneWeek) {
+  } else if (diff < twoDays) {
+    return `Airs tomorrow`;
+  } else if (diff < oneWeek) {
     // In the next week
     return `Airs ${weekday}`;
   } else {
