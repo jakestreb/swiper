@@ -158,7 +158,7 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
       fileObj[target] = t.map(item => item.getObject());
       if (Array.isArray(finalArr)) {
         return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2))
-          .then(() => 'Added to ${target}.');
+          .then(() => `Added to ${target}.`);
       } else {
         return finalArr;
       }
