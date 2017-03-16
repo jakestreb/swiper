@@ -506,10 +506,7 @@ Swiper.prototype._resolveSeasonToEpisode = function(season) {
     episodeNum = episodeNum ? parseInt(episodeNum, 10) : null;
     return episodeNum || this._resolveSeasonToEpisode(season);
   })
-  .then(episodeNum => {
-    console.warn('s -> e', season, episodeNum, season.episodes.find(ep => ep.episodeNum === episodeNum));
-    return season.episodes.find(ep => ep.episodeNum === episodeNum);
-  });
+  .then(episodeNum => season.episodes.find(ep => ep.episodeNum === episodeNum));
 };
 
 // Parses a titleStr into constituent parts
