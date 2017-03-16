@@ -549,10 +549,10 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
     next = true;
     responses.push(resp.next);
   }
+  let moveStr = (next || prev) ? ((prev ? '"prev", ' : '') + (next ? '"next", ' : '') + 'or ') : '';
   return this.awaitResponse(`Found torrents:\n` +
     `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1}. ` + t.toString(), "")}` +
-    `Type ${prev ? '"prev", ' : ""}${next ? '"next", ' : ""}or "download" followed ` +
-    `by the number of the torrent you'd like.`, responses)
+    `Type ${moveStr}"download" followed by the number of the torrent you'd like.`, responses)
   .then(resp => {
     let numStr, num;
     switch (resp.match) {
@@ -561,7 +561,7 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
       case 'next':
         return this._showSomeTorrents(video, torrents, type, startIndex + n);
       case 'download':
-        [numStr] = this._execCapture(resp.input, /\bd(?:ownload)?\s*(\d)/, 1);
+        [numStr] = this._execCapture(resp.input, /\bd(?:ownload)?\s*(\d)/gi, 1);
         if (!numStr) {
           return this._showSomeTorrents(video, torrents, type, startIndex);
         }
