@@ -44,8 +44,8 @@ function identifyContent(swiperId, options) {
         return collection;
       });
     }
-  });
-  // .catch(() => null);
+  })
+  .catch(() => null);
 }
 exports.identifyContent = identifyContent;
 
@@ -180,6 +180,7 @@ function getAiredString(date) {
   let oneDay = 86400000;
   let twoDays = 2 * oneDay;
   let oneWeek = 7 * oneDay;
+  let sixMonths = 182 * oneDay;
   let weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   let months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
     'September', 'October', 'November', 'December'];
@@ -187,7 +188,9 @@ function getAiredString(date) {
   let month = months[date.getMonth()];
   let calDay = date.getDate();
   let diff = date.getTime() - getMorning().getTime();
-  if (diff < -oneWeek) {
+  if (diff < -sixMonths || diff > sixMonths) {
+    return '';
+  } else if (diff < -oneWeek) {
     // Over a week ago
     return `Aired ${weekday}, ${month} ${calDay}`;
   } else if (diff < -oneDay) {

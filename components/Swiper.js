@@ -471,6 +471,7 @@ Swiper.prototype._identifyContentFromInput = function(input) {
 Swiper.prototype._resolveSearchToEpisode = function(collection) {
   let breadth = collection.getInitialType();
   let isSeries = breadth === 'series';
+  console.warn('!!!', collection);
   return this.awaitResponse(`Give the ${isSeries ? "season and " : ""}episode ` +
     `number${isSeries ? "s" : ""} to search or type "download" to get the whole ${breadth}.`,
     [isSeries ? resp.seasonOrEpisode : resp.episode, resp.download]
@@ -481,19 +482,29 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
       let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
       if (!season || !collection.hasSeason(season)) {
+        this.send(`I can't see that season of ${collection.getTitle()}.`);
         return this._resolveSearchToEpisode(collection);
       } else if (!episode) {
         collection.filterToSeason(season);
         return this._resolveSeasonToEpisode(collection);
       } else {
-        return collection.getEpisode(season, episode);
+        let pickedEp = collection.getEpisode(season, episode);
+        if (!pickedEp) {
+          this.send(`I'm sorry, I can't seem to find that episode.`);
+        }
+        return pickedEp || this._resolveSearchToEpisode(collection);
       }
     } else {
       let episode = this._captureEpisode(feedback.input);
       if (!episode) {
+        this.send(`I don't understand.`);
         return this._resolveSeasonToEpisode(collection);
       } else {
-        return collection.getEpisode(collection.getInitialSeason(), episode);
+        let pickedEp = collection.getEpisode(collection.getInitialSeason(), episode);
+        if (!pickedEp) {
+          this.send(`I'm sorry, I can't seem to find that episode.`);
+        }
+        return pickedEp || this._resolveSearchToEpisode(collection);
       }
     }
   });
