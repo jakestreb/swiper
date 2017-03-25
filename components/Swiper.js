@@ -8,6 +8,8 @@ const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
+// TODO: Add optional tv/movie keyword
+
 // TODO: Figure out why there are so many listeners on client.add.
 // TODO: Test monitored found torrent and monitored released today.
 // TODO: Test multiple users.
@@ -116,8 +118,8 @@ Swiper.prototype.getStatus = function() {
   .then(memory => {
     return "\nMonitoring:\n" +
       (memory.monitored.map(item => {
-        return indentFunc(item) + item.getDesc() +
-          (item.type === 'collection' ? `  (${item.getNextAirs()})` : '');
+        let nextAirs = item.type === 'collection' ? item.getNextAirs() : null;
+        return indentFunc(item) + item.getDesc() + (nextAirs ? `  (${item.getNextAirs()})` : '');
       }).join("\n") || "None") + "\n\n" +
       "Queued:\n" +
       (memory.queued.map(item => indentFunc(item) + item.getDesc())
@@ -197,7 +199,7 @@ Swiper.prototype.download = function(input) {
 // This should always be called to download content. Adds a video to the queue
 // or starts the download if max concurrent downloads is not met.
 // If noPrompt is set, no prompts will be offered to the user.
-// NOTE: This is usuaully called before the torrent is found, but may be called after it is selected.
+// NOTE: This is usually called before the torrent is found, but may be called after it is selected.
 Swiper.prototype.queueDownload = function(content, noPrompt) {
   let addCount = settings.maxDownloads - this.downloadCount;
   let ready = [];
@@ -370,7 +372,7 @@ Swiper.prototype._removeContent = function(content, ignoreDownloading, hidePromp
       let queue = memory[name];
       let memIsCandidate = queue.find(item => item.containsAny(content));
       if (memIsCandidate) {
-        prompts.push(this._confirmAction.bind(this, `Remove ${content.getDesc()} from ${name}?`,
+        prompts.push(this._confirmAction.bind(this, `Remove ${content.getTitle()} from ${name}?`,
           () => this.dispatcher.updateMemory(this.id, name, 'remove', content), hidePrompts));
       }
     }
@@ -388,7 +390,7 @@ Swiper.prototype._removeContent = function(content, ignoreDownloading, hidePromp
       return prompts.reduce((acc, prompt) => {
         return acc.then(() => prompt());
       }, Promise.resolve())
-      .then(() => 'Removed.');
+      .then(() => 'Got it.');
     } else {
       return `${content.getDesc()} is not being monitored, queued or downloaded.`;
     }
@@ -471,10 +473,9 @@ Swiper.prototype._identifyContentFromInput = function(input) {
 Swiper.prototype._resolveSearchToEpisode = function(collection) {
   let breadth = collection.getInitialType();
   let isSeries = breadth === 'series';
-  console.warn('!!!', collection);
   return this.awaitResponse(`Give the ${isSeries ? "season and " : ""}episode ` +
     `number${isSeries ? "s" : ""} to search or type "download" to get the whole ${breadth}.`,
-    [isSeries ? resp.seasonOrEpisode : resp.episode, resp.download]
+    [isSeries ? resp.seasonOrEpisode : resp.number, resp.download]
   ).then(feedback => {
     if (feedback.match === 'download') {
       this.queueDownload(collection);
@@ -495,7 +496,8 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
         return pickedEp || this._resolveSearchToEpisode(collection);
       }
     } else {
-      let episode = this._captureEpisode(feedback.input);
+      let [ episode ] = this._execCapture(feedback.input, /([0-9]+)/gi, 1);
+      episode = parseInt(episode, 10);
       if (!episode) {
         this.send(`I don't understand.`);
         return this._resolveSeasonToEpisode(collection);

@@ -9,6 +9,13 @@ const rimraf = require('rimraf');
 const access = Promise.promisify(fs.access);
 const mkdir = Promise.promisify(fs.mkdir);
 const rimrafAsync = Promise.promisify(rimraf);
+const omdb = require('omdb');
+const TVDB = require('node-tvdb');
+const tvdb = new TVDB('4B4DF40E7F46F41F');
+// API Key from: http://thetvdb.com/index.php?tab=apiregister
+// Username: rearmostdrip
+// Password: superman123
+Promise.promisifyAll(omdb);
 
 const Movie = require('../components/Movie.js');
 const Episode = require('../components/Episode.js');
@@ -21,27 +28,34 @@ const rootDir = process.env.EXPORT_ROOT || path.resolve(__dirname, '../media');
 function identifyContent(swiperId, options) {
   let season = options.season ? parseInt(options.season, 10) : null;
   let episode = options.episode ? parseInt(options.episode, 10) : null;
-  return imdb.getReq({ name: options.title, year: options.year })
-  .then(imdbEntry => {
-    if (imdbEntry.type === 'movie') {
+  return omdb.getAsync({ title: options.title, year: options.year })
+  .then(omdbEntry => {
+    if (omdbEntry.type === 'movie') {
       // Movie
-      return new Movie(swiperId, imdbEntry.title, imdbEntry.year);
-    } else if (season && episode) {
-      // Episode
-      return imdbEntry.episodes()
-      .then(allEpisodes => {
-        let ep = allEpisodes.find(ep => ep.season === season && ep.episode === episode);
-        return new Episode(swiperId, imdbEntry.title, ep.season, ep.episode, ep.released);
-      });
+      return new Movie(swiperId, omdbEntry.title, omdbEntry.year);
     } else {
-      // Collection
-      return imdbEntry.episodes()
+      return tvdb.getSeriesByName(omdbEntry.title)
+      .then(tvdbEntries => {
+        if (tvdbEntries.length === 0) {
+          return null;
+        } else {
+          let tvdbEntry = tvdbEntries[0];
+          return tvdb.getEpisodesBySeriesId(tvdbEntry.id);
+        }
+      })
       .then(allEpisodes => {
-        let eps = allEpisodes.filter(ep => !season || ep.season === season)
-          .map(ep => new Episode(swiperId, imdbEntry.title, ep.season, ep.episode, ep.released));
-        let collection = new Collection(swiperId, imdbEntry.title, eps, season ? 'season' : 'series',
-          season);
-        return collection;
+        if (season && episode) {
+          let ep = allEpisodes.find(ep => ep.airedSeason === season &&
+            ep.airedEpisodeNumber === episode);
+          return new Episode(swiperId, omdbEntry.title, ep.airedSeason, ep.airedEpisodeNumber,
+            new Date(ep.firstAired));
+        } else {
+          let eps = allEpisodes.filter(ep => !season || ep.airedSeason === season)
+            .map(ep => new Episode(swiperId, omdbEntry.title, ep.airedSeason, ep.airedEpisodeNumber,
+              new Date(ep.firstAired)));
+          return new Collection(swiperId, omdbEntry.title, eps,
+            season ? 'season' : 'series', season);
+        }
       });
     }
   })
@@ -82,14 +96,8 @@ exports.torrentSearch = torrentSearch;
 function exportVideo(video) {
   let dirs = video.getType() === 'movie' ? ['movies'] :
     ['tv', video.getSafeTitle(), `Season ${video.seasonNum}`];
-  // TODO: remove
-  // console.warn('dirs', dirs);
-  // console.warn('rootDir', rootDir);
   return Promise.reduce(dirs, (acc, dir) => {
     // Check if all directories exist along the way, creating them if they don't.
-    // TODO: remove
-    // console.warn('acc', acc);
-    // console.warn('dir', dir);
     return Promise.resolve(acc).then(prevPath => {
       let newPath = path.join(prevPath, dir);
       return access(newPath, fs.constants.F_OK)
@@ -102,11 +110,6 @@ function exportVideo(video) {
     let tfile = video.torrent.tfile;
     return Promise.all(tfile.files.map(file => {
       let origPath = path.join(tfile.path, file.path);
-      // TODO: remove
-      // console.warn('A', tfile.path);
-      // console.warn('B', file.name);
-      // console.warn('dwld path', origPath);
-      // console.warn('final path', finalPath);
       return copy(origPath, path.join(finalPath, file.name))
       .then(() => {
         // Return the first download root subdirectory of each file for deletion.
@@ -189,7 +192,7 @@ function getAiredString(date) {
   let calDay = date.getDate();
   let diff = date.getTime() - getMorning().getTime();
   if (diff < -sixMonths || diff > sixMonths) {
-    return '';
+    return null;
   } else if (diff < -oneWeek) {
     // Over a week ago
     return `Aired ${weekday}, ${month} ${calDay}`;

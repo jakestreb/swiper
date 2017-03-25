@@ -35,6 +35,11 @@ exports.episode = {
   regex: /\b(ep?(isode)? ?(\d{1,2}))\b/gi
 };
 
+exports.number = {
+  value: 'number',
+  regex: /\b[0-9]+\b/gi
+};
+
 exports.search = {
   value: 'search',
   regex: /\bs(earch)?\b/gi

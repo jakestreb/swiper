@@ -17,6 +17,9 @@ function Collection(swiperId, title, episodes, optInitialType, optInitialSeason)
   this.initialSeason = optInitialSeason; // Should be the number of the season, if applicable.
 
   this.createdAt = new Date();
+
+  // Make sure episodes invariant holds.
+  this.sortEpisodes();
 }
 _.extend(Collection.prototype, Content.prototype);
 
@@ -34,6 +37,10 @@ Collection.prototype.hasSeason = function(seasonNum) {
 
 Collection.prototype.getEpisode = function(seasonNum, episodeNum) {
   return this.episodes.find(ep => ep.seasonNum === seasonNum && ep.episodeNum === episodeNum);
+};
+
+Collection.prototype.sortEpisodes = function() {
+  return this.episodes.sort((a, b) => a.isEarlierThan(b) ? -1 : 1);
 };
 
 Collection.prototype.getNextAirs = function() {
@@ -82,7 +89,8 @@ Collection.prototype.addContent = function(content) {
     });
     this.episodes.unshift(newStuff);
   }
-  this.episodes.sort((a, b) => a.isEarlierThan(b) ? -1 : 1);
+  // Maintain episodes invariant after addition.
+  this.sortEpisodes();
 };
 
 Collection.prototype.removeContent = function(content) {
