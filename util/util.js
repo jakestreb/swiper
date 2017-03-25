@@ -1,7 +1,6 @@
 'use strict';
 
 const Promise = require('bluebird');
-const imdb = require('imdb-api');
 const PirateBay = require('thepiratebay');
 const fs = require('fs');
 const path = require('path');
