@@ -337,9 +337,12 @@ Swiper.prototype._commandDetail = function(cmd) {
     let arg = cmdInfo.arg ? ' ' + cmdInfo.arg : '';
     let out = `${cmd}${arg}:  ${cmdInfo.desc}\n\n`;
     if (cmdInfo.arg === '<content>') {
-      return out + `Where <content> is one of:\n` +
-        `    <movie> (<year>)\n` +
-        `    <series> (<year>) (season <num>) (episode <num>)\n`;
+      return out + `Where <content> is of the form:\n` +
+        `    (movie/tv) <title> (<year>) (season <num>) (episode <num>)\n` +
+        `Items in parenthesis are optional. Examples of valid <content> items:\n` +
+        `    game of thrones\n` +
+        `    tv game of thrones season 2\n` +
+        `    game of thrones 2011 s02e05\n`;
     }
     return out;
   }
@@ -528,6 +531,13 @@ Swiper.prototype._parseTitle = function(titleStr) {
   const yearFinder = /\b(\d{4})\b/gi;
   const epFinder = /\bs(?:eason)? ?(\d{1,2}) ?(?:ep?(?:isode)? ?(\d{1,2}))?\b/gi;
 
+  let splitStr = titleStr.split(' ');
+  let type = null;
+  if (splitStr[0] === 'tv' || splitStr[0] === 'movie') {
+    // If the type was included, set it and remove it from the titleStr
+    type = splitStr[0] === 'tv' ? 'series' : 'movie';
+    titleStr = splitStr.slice(1).join(' ');
+  }
   let [title] = this._execCapture(titleStr, titleFinder, 1);
   if (!title) {
     return {};
@@ -537,6 +547,7 @@ Swiper.prototype._parseTitle = function(titleStr) {
   let [season, episode] = this._execCapture(rem, epFinder, 2);
   return {
     title: title,
+    type: type,
     year: year,
     season: season,
     episode: episode

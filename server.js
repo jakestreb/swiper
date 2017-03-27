@@ -8,7 +8,7 @@ const rimrafAsync = Promise.promisify(rimraf);
 
 const Dispatcher = require('./components/Dispatcher.js');
 
-const gatewayUrl = 'https://limitless-island-56260.herokuapp.com/swiper';
+const gatewayUrl = process.env.GATEWAY_URL || 'https://limitless-island-56260.herokuapp.com/swiper';
 const reqTimeout = 20000;
 
 // Delete everything in downloads folder.

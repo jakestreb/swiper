@@ -27,7 +27,7 @@ const rootDir = process.env.EXPORT_ROOT || path.resolve(__dirname, '../media');
 function identifyContent(swiperId, options) {
   let season = options.season ? parseInt(options.season, 10) : null;
   let episode = options.episode ? parseInt(options.episode, 10) : null;
-  return omdb.getAsync({ title: options.title, year: options.year })
+  return omdb.getAsync({ title: options.title, year: options.year, type: options.type })
   .then(omdbEntry => {
     if (omdbEntry.type === 'movie') {
       // Movie
