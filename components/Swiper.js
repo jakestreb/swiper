@@ -339,7 +339,7 @@ Swiper.prototype._commandDetail = function(cmd) {
     if (cmdInfo.arg === '<content>') {
       return out + `Where <content> is of the form:\n` +
         `    (movie/tv) <title> (<year>) (season <num>) (episode <num>)\n` +
-        `Items in parenthesis are optional. Examples of valid <content> items:\n` +
+        `Examples:\n` +
         `    game of thrones\n` +
         `    tv game of thrones season 2\n` +
         `    game of thrones 2011 s02e05\n`;
