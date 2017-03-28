@@ -532,10 +532,11 @@ Swiper.prototype._parseTitle = function(titleStr) {
   const epFinder = /\bs(?:eason)? ?(\d{1,2}) ?(?:ep?(?:isode)? ?(\d{1,2}))?\b/gi;
 
   let splitStr = titleStr.split(' ');
+  let keyword = splitStr[0].toLowerCase();
   let type = null;
-  if (splitStr[0] === 'tv' || splitStr[0] === 'movie') {
+  if (keyword === 'tv' || keyword === 'movie') {
     // If the type was included, set it and remove it from the titleStr
-    type = splitStr[0] === 'tv' ? 'series' : 'movie';
+    type = keyword === 'tv' ? 'series' : 'movie';
     titleStr = splitStr.slice(1).join(' ');
   }
   let [title] = this._execCapture(titleStr, titleFinder, 1);
