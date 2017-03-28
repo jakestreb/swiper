@@ -33,7 +33,7 @@ function identifyContent(swiperId, options) {
       // Movie
       return new Movie(swiperId, omdbEntry.title, omdbEntry.year);
     } else {
-      return tvdb.getSeriesByName(omdbEntry.title)
+      return tvdb.getSeriesByImdbId(omdbEntry.imdb.id)
       .then(tvdbEntries => {
         if (tvdbEntries.length === 0) {
           return null;
