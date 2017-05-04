@@ -45,8 +45,9 @@ Collection.prototype.sortEpisodes = function() {
 
 Collection.prototype.getNextAirs = function() {
   let morning = util.getMorning();
-  let leastOld = this.episodes.slice().reverse().find(ep => ep.releaseDate < morning);
-  let leastNew = this.episodes.find(ep => ep.releaseDate >= morning);
+  let leastOld = this.episodes.slice().reverse()
+    .find(ep => ep.releaseDate && (ep.releaseDate < morning));
+  let leastNew = this.episodes.find(ep => ep.releaseDate && (ep.releaseDate >= morning));
   return util.getAiredString((leastNew || leastOld).releaseDate);
 };
 

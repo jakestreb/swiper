@@ -8,13 +8,10 @@ const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
-// TODO: Add optional tv/movie keyword
+// TODO: Take advantage of release times and duration for auto-searching.
+// TODO: Allow new commands to short circuit conversations.
 
 // TODO: Figure out why there are so many listeners on client.add.
-// TODO: Test monitored found torrent and monitored released today.
-// TODO: Test multiple users.
-
-// TODO: Restart on all exceptions.
 // TODO: Create readme (heroku address, how to check ips, etc).
 
 function Swiper(dispatcher, id, fromSwiper) {
@@ -49,7 +46,7 @@ Swiper.prototype.awaitInput = function(optMessage) {
     this.toSwiper = resolve;
   })
   .then(input => input.toLowerCase() === 'cancel' ?
-    this.awaitCommand('Ok, nevermind. Need anything else?') : input
+    this.awaitCommand('Ok, nevermind.') : input
   );
 };
 
@@ -172,7 +169,7 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
       }
     } else {
       // New
-      series.filterEpisodes(ep => ep.releaseDate > util.getMorning());
+      series.filterEpisodes(ep => ep.releaseDate && (ep.releaseDate > util.getMorning()));
       return this.dispatcher.updateMemory(this.id, 'monitored', 'add', series);
     }
   });
@@ -466,10 +463,11 @@ Swiper.prototype._identifyContentFromInput = function(input) {
   }
   return util.identifyContent(this.id, videoData)
   .then(content => {
-    if (!content) {
-      throw new InputError("I can't find anything with that title.");
-    }
     return content;
+  })
+  .catch(err => {
+    // Rethrow identifyContent errors as input errors.
+    throw new InputError(err);
   });
 };
 
@@ -546,6 +544,10 @@ Swiper.prototype._parseTitle = function(titleStr) {
   let rem = this._removePrefix(titleStr, title);
   let [year] = this._execCapture(rem, yearFinder, 1);
   let [season, episode] = this._execCapture(rem, epFinder, 2);
+  if (season || episode) {
+    // Assume it's a series if season or episode is given.
+    type = 'series';
+  }
   return {
     title: title,
     type: type,

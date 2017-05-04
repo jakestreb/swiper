@@ -4,11 +4,11 @@ const _ = require('underscore');
 const Video = require('./Video.js');
 const util = require('../util/util.js');
 
-function Episode(swiperId, title, seasonNum, episodeNum, releaseDate) {
+function Episode(swiperId, title, seasonNum, episodeNum, optReleaseDate) {
   Video.call(this, swiperId, title, 'episode');
   this.seasonNum = seasonNum;
   this.episodeNum = episodeNum;
-  this.releaseDate = releaseDate;
+  this.releaseDate = optReleaseDate;
 }
 _.extend(Episode.prototype, Video.prototype);
 
@@ -56,7 +56,7 @@ Episode.prototype.getObject = function() {
     title: this.title,
     seasonNum: this.seasonNum,
     episodeNum: this.episodeNum,
-    releaseDateStr: this.releaseDate.toISOString(),
+    releaseDateStr: this.releaseDate ? this.releaseDate.toISOString() : '',
     swiperId: this.swiperId
   };
 };

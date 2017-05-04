@@ -69,11 +69,11 @@ Dispatcher.prototype.acceptMessage = function(type, id, message) {
 // for a set number of tries.
 Dispatcher.prototype.startMonitoring = function() {
   let now = new Date();
-  let toTen = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+  let untilSearchTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
     settings.monitor.hour, settings.monitor.minute) - now;
   let dailyRepeats = 0;
   // If the time has passed, add a full day.
-  return Promise.delay(toTen < 0 ? toTen + 86400000 : toTen)
+  return Promise.delay(untilSearchTime < 0 ? untilSearchTime + 86400000 : untilSearchTime)
   .then(() => this.searchMonitored())
   .then(() => {
     // If any episodes were released today, repeatedly search for them until they are
@@ -163,8 +163,11 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
         return finalArr;
       }
     })
-    .catch(() => `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +
-      `${target}.` : `removing ${item.getTitle()} from ${target}.`}`);
+    .catch(err => {
+      console.log('updateMemory err:', err);
+      return `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +
+        `${target}.` : `removing ${item.getTitle()} from ${target}.`}`;
+    });
   });
 };
 
@@ -290,7 +293,7 @@ function _objToContent(obj) {
       return new Movie(obj.swiperId, obj.title, obj.year);
     case 'episode':
       return new Episode(obj.swiperId, obj.title, obj.seasonNum, obj.episodeNum,
-        new Date(obj.releaseDateStr));
+        obj.releaseDateStr ? new Date(obj.releaseDateStr) : null);
     case 'collection':
       return new Collection(obj.swiperId, obj.title,
         obj.episodes.map(ep => _objToContent(ep)), obj.initialType);

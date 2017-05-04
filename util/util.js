@@ -10,7 +10,11 @@ const mkdir = Promise.promisify(fs.mkdir);
 const rimrafAsync = Promise.promisify(rimraf);
 const omdb = require('omdb');
 const TVDB = require('node-tvdb');
-const tvdb = new TVDB('4B4DF40E7F46F41F');
+
+const TVDB_ID = '4B4DF40E7F46F41F';
+
+var tvdb = new TVDB(TVDB_ID);
+
 // API Key from: http://thetvdb.com/index.php?tab=apiregister
 // Username: rearmostdrip
 // Password: superman123
@@ -29,38 +33,55 @@ function identifyContent(swiperId, options) {
   let episode = options.episode ? parseInt(options.episode, 10) : null;
   return omdb.getAsync({ title: options.title, year: options.year, type: options.type })
   .then(omdbEntry => {
-    if (omdbEntry.type === 'movie') {
+    if (!omdbEntry) {
+      throw "I can't find anything like that.";
+    } else if (omdbEntry.type === 'movie') {
       // Movie
       return new Movie(swiperId, omdbEntry.title, omdbEntry.year);
     } else {
-      return tvdb.getSeriesByImdbId(omdbEntry.imdb.id)
-      .then(tvdbEntries => {
-        if (tvdbEntries.length === 0) {
-          return null;
-        } else {
-          let tvdbEntry = tvdbEntries[0];
-          return tvdb.getEpisodesBySeriesId(tvdbEntry.id);
-        }
-      })
-      .then(allEpisodes => {
+      return _searchTVDB(omdbEntry.imdb.id)
+      .then(resp => {
         if (season && episode) {
-          let ep = allEpisodes.find(ep => ep.airedSeason === season &&
+          let ep = resp.episodes.find(ep => ep.airedSeason === season &&
             ep.airedEpisodeNumber === episode);
           return new Episode(swiperId, omdbEntry.title, ep.airedSeason, ep.airedEpisodeNumber,
-            new Date(ep.firstAired));
+            _getEpisodeDate(resp, ep));
         } else {
-          let eps = allEpisodes.filter(ep => !season || ep.airedSeason === season)
+          let eps = resp.episodes.filter(ep => !season || ep.airedSeason === season)
             .map(ep => new Episode(swiperId, omdbEntry.title, ep.airedSeason, ep.airedEpisodeNumber,
-              new Date(ep.firstAired)));
+              _getEpisodeDate(resp, ep)));
           return new Collection(swiperId, omdbEntry.title, eps,
             season ? 'season' : 'series', season);
         }
       });
     }
   })
-  .catch(() => null);
+  .catch(err => {
+    console.log('identifyContent error:', err);
+    throw "I can't find that right now because something is wrong with me.";
+  });
 }
 exports.identifyContent = identifyContent;
+
+// Helper function to search TVDB and retry with a refreshed API token on error.
+function _searchTVDB(imdbId, retryAttempt) {
+  return tvdb.getSeriesByImdbId(imdbId)
+  .then(tvdbEntries => tvdb.getSeriesAllById(tvdbEntries[0].id))
+  .catch(err => {
+    if (retryAttempt) {
+      throw err;
+    }
+    // On initial failure, refresh authentication.
+    tvdb = new TVDB(TVDB_ID);
+    return _searchTVDB(imdbId, true);
+  });
+}
+
+// Get the episode release date from tvdb response data.
+function _getEpisodeDate(tvdbSeries, tvdbEpisode) {
+  return tvdbEpisode.firstAired ?
+    new Date(`${tvdbEpisode.firstAired} ${tvdbSeries.airsTime}`) : null;
+}
 
 function torrentSearch(video, optRetryCount) {
   return PirateBay.search(video.getSearchTerm(), {
@@ -179,6 +200,9 @@ function getTomorrowMorning() {
 exports.getTomorrowMorning = getTomorrowMorning;
 
 function getAiredString(date) {
+  if (!date) {
+    return '';
+  }
   let oneDay = 86400000;
   let twoDays = 2 * oneDay;
   let oneWeek = 7 * oneDay;
@@ -201,15 +225,22 @@ function getAiredString(date) {
   } else if (diff < 0) {
     return `Aired yesterday`;
   } else if (diff < oneDay) {
-    return `Airs today`;
+    return `Airs today at ${_getTimeString(date)}`;
   } else if (diff < twoDays) {
-    return `Airs tomorrow`;
+    return `Airs tomorrow at ${_getTimeString(date)}`;
   } else if (diff < oneWeek) {
     // In the next week
-    return `Airs ${weekday}`;
+    return `Airs ${weekday} at ${_getTimeString(date)}`;
   } else {
     // More than a week ahead
     return `Airs ${weekday}, ${month} ${calDay}`;
   }
 }
 exports.getAiredString = getAiredString;
+
+function _getTimeString(date) {
+  let hours = date.getHours();
+  let minutesStr = (date.getMinutes() + '0').slice(0, 2);
+  let ampm = hours < 12 ? 'am' : 'pm';
+  return `${hours % 12 || 12}:${minutesStr}${ampm}`;
+}

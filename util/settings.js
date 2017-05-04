@@ -20,9 +20,9 @@ module.exports = {
   minSeeders: 20,
   monitor: {
     hour: 22, // 0-23, hour at which monitored should be searched.
-    minute: 0,  // 0-59, minute after the hour at which monitored should be searched.
-    repeatWait: 20, // minutes after failure to find content released the same day to search again.
-    repeatCount: 9 // number of times after failure to find content released the same day.
+    minute: 30,  // 0-59, minute after the hour at which monitored should be searched.
+    repeatWait: 15, // minutes after failure to find content released the same day to search again.
+    repeatCount: 10 // number of times after failure to find content released the same day.
   },
   displayTorrents: 4, // Number of torrents to show at a time after searching.
   maxDownloads: 3 // Concurrent downloads allowed per swiper instance.
