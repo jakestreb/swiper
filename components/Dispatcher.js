@@ -79,18 +79,21 @@ Dispatcher.prototype.startMonitoring = function() {
     // If any episodes were released today, repeatedly search for them until they are
     // found (removed from the array) or until a max number or times.
     let repeatFunc = todayCount => {
-      if (dailyRepeats < settings.repeatCount && todayCount > 0) {
-        dailyRepeats++;
-        return Promise.delay(settings.repeatWait * 60 * 1000)
+      if (dailyRepeats < settings.repeat.length && todayCount > 0) {
+        return Promise.delay(settings.repeat[dailyRepeats] * 60 * 1000)
         .then(() => this.searchMonitored(item => item.releaseDate &&
           item.releaseDate.toDateString() === new Date().toDateString()))
-        .then(count => repeatFunc(count));
+        .then(count => {
+          dailyRepeats++;
+          return repeatFunc(count);
+        });
       }
     };
     return repeatFunc(1);
   })
   .finally(() => this.startMonitoring());
 };
+
 
 // Returns the length of the filtered monitor array.
 Dispatcher.prototype.searchMonitored = function(optFilter) {
@@ -100,6 +103,7 @@ Dispatcher.prototype.searchMonitored = function(optFilter) {
   .then(memory => {
     let interested = memory.monitored.filter(item => optFilter(item));
     interested.forEach(item => {
+      console.log('Searching for ' + item.getDesc());
       let swiper = this.swipers[item.swiperId];
       owners[swiper.id] = owners[swiper.id] || [];
       owners[swiper.id].push(item);

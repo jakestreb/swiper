@@ -201,7 +201,7 @@ exports.getTomorrowMorning = getTomorrowMorning;
 
 function getAiredString(date) {
   if (!date) {
-    return '';
+    return null;
   }
   let oneDay = 86400000;
   let twoDays = 2 * oneDay;

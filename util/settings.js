@@ -7,12 +7,12 @@ module.exports = {
   },
   size: {
     episode: {
-      min: 300, // Mb
-      max: 2000
+      min: 200, // Mb
+      max: 2500
     },
     movie: {
-      min: 600,
-      max: 4000
+      min: 500,
+      max: 4500
     }
   },
   // Low seeder tier to determine download pick quality. Things with fewer seeders than this
@@ -21,8 +21,8 @@ module.exports = {
   monitor: {
     hour: 22, // 0-23, hour at which monitored should be searched.
     minute: 30,  // 0-59, minute after the hour at which monitored should be searched.
-    repeatWait: 15, // minutes after failure to find content released the same day to search again.
-    repeatCount: 10 // number of times after failure to find content released the same day.
+    // Minutes in each repeat interval. Stops retrying when the end of the array is reached.
+    repeat: [15, 15, 15, 15, 15, 15, 15, 15, 30, 30, 30, 30, 60, 60]
   },
   displayTorrents: 4, // Number of torrents to show at a time after searching.
   maxDownloads: 3 // Concurrent downloads allowed per swiper instance.
