@@ -26,7 +26,7 @@ Episode.prototype.equals = function(ep) {
 };
 
 Episode.prototype.getSearchTerm = function() {
-  return `${this.title.replace(/[^a-zA-Z ]/g, "")} ` +
+  return `${this.title.replace(/[^a-zA-Z ]+/g, " ")} ` +
     `s${util.padZeros(this.seasonNum)}e${util.padZeros(this.episodeNum)}`;
 };
 
