@@ -39,9 +39,13 @@ function identifyContent(swiperId, options) {
     type: options.type,
     apikey: OMDB_ID
   })
+  .catch(err => {
+    console.log('OMDB err:', err);
+    throw new Error("It looks like the Open Movie Database is down. Try again in a little while.");
+  })
   .then(omdbEntry => {
     if (!omdbEntry) {
-      throw "I can't find anything like that.";
+      throw new Error("I can't find anything like that.");
     } else if (omdbEntry.type === 'movie') {
       // Movie
       return new Movie(swiperId, omdbEntry.title, omdbEntry.year);
@@ -60,12 +64,12 @@ function identifyContent(swiperId, options) {
           return new Collection(swiperId, omdbEntry.title, eps,
             season ? 'season' : 'series', season);
         }
+      })
+      .catch(err => {
+        console.log('TVDB error:', err);
+        throw new Error("I can't find that show.");
       });
     }
-  })
-  .catch(err => {
-    console.log('identifyContent error:', err);
-    throw "I can't find that right now because something is wrong with me.";
   });
 }
 exports.identifyContent = identifyContent;
