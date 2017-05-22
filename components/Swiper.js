@@ -467,7 +467,7 @@ Swiper.prototype._identifyContentFromInput = function(input) {
   })
   .catch(err => {
     // Rethrow identifyContent errors as input errors.
-    throw new InputError(err);
+    throw new InputError(err.message);
   });
 };
 
