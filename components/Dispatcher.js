@@ -1,6 +1,8 @@
 'use strict';
 
+const _ = require('underscore');
 const Promise = require('bluebird');
+const BackboneEvents = require('backbone-events-standalone');
 const AsyncLock = require('async-lock');
 const fs = require('fs');
 const readFile = Promise.promisify(fs.readFile);
@@ -12,11 +14,14 @@ const Movie = require('./Movie.js');
 const Episode = require('./Episode.js');
 const Collection = require('./Collection.js');
 const settings = require('../util/settings.js');
+const util = require('../util/util.js');
 
 function Dispatcher(respondFuncs) {
   this.respondFuncs = respondFuncs;
   this.swipers = {};
   this.downloading = [];
+  // Monitored episodes that are currently actively being searched for.
+  this.searching = [];
 
   // Lock should be acquired before reading/writing memory.json
   this.memoryLock = new AsyncLock({
@@ -33,7 +38,21 @@ function Dispatcher(respondFuncs) {
 
   // Start monitoring items.
   this.startMonitoring();
+  this.startSearchingUpcomingEpisodes();
+
+  // When an item is added to monitored, add any upcoming episodes involved to be searched.
+  this.on('monitored-add', item => {
+    this._addUpcomingToSearch(item);
+  });
+  // When an item is removed from monitored, remove any upcoming episodes involved from searching.
+  this.on('monitored-remove', item => {
+    let upcoming = this._getUpcomingEpisodes(item);
+    upcoming.forEach(ep => {
+      util.removeFirst(this.searching, ep);
+    });
+  });
 }
+_.extend(Dispatcher.prototype, BackboneEvents);
 
 Dispatcher.prototype.initFacebookSwipers = function() {
   return this.memoryLock.acquire('key', () => {
@@ -59,41 +78,89 @@ Dispatcher.prototype.acceptMessage = function(type, id, message) {
       this.saveSwiper(id);
     }
   }
-  // console.warn('ACCEPTED MESSAGE', message);
-  // console.warn('id', id);
-  // console.warn('swipers', this.swipers);
 };
 
 // Search for monitored items daily at the time given in settings.
 // If episodes were released on a given day, repeat searching on failures after a delay
 // for a set number of tries.
 Dispatcher.prototype.startMonitoring = function() {
+  const DAY = 86400000;
   let now = new Date();
   let untilSearchTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
-    settings.monitor.hour, settings.monitor.minute) - now;
-  let dailyRepeats = 0;
+    settings.monitor.hour) - now;
   // If the time has passed, add a full day.
-  return Promise.delay(untilSearchTime < 0 ? untilSearchTime + 86400000 : untilSearchTime)
-  .then(() => this.searchMonitored())
+  return Promise.delay(untilSearchTime < 0 ? untilSearchTime + DAY : untilSearchTime)
   .then(() => {
-    // If any episodes were released today, repeatedly search for them until they are
-    // found (removed from the array) or until a max number or times.
-    let repeatFunc = todayCount => {
-      if (dailyRepeats < settings.repeat.length && todayCount > 0) {
-        return Promise.delay(settings.repeat[dailyRepeats] * 60 * 1000)
-        .then(() => this.searchMonitored(item => item.releaseDate &&
-          item.releaseDate.toDateString() === new Date().toDateString()))
-        .then(count => {
-          dailyRepeats++;
-          return repeatFunc(count);
-        });
-      }
-    };
-    return repeatFunc(1);
+    this.searchMonitored();
+    // This is called daily to add newly upcoming episodes to be searched.
+    this.startSearchingUpcomingEpisodes();
   })
   .finally(() => this.startMonitoring());
 };
 
+// Adds any upcoming episodes to the search array and prepares to check for them.
+Dispatcher.prototype.startSearchingUpcomingEpisodes = function() {
+  return Promise.try(() => {
+    return this.readMemory()
+    .then(memory => {
+      // Iterate through monitored, adding all upcoming episodes to searching.
+      memory.monitored.forEach(item => {
+        this._addUpcomingToSearch(item);
+      });
+    });
+  });
+};
+
+// Add all upcoming episodes out of a collection or episodes to be searched.
+Dispatcher.prototype._addUpcomingToSearch = function(item) {
+  let search = this._getUpcomingEpisodes(item);
+  search.forEach(episode => {
+    if (!this.searching.includes(episode)) {
+      this.searching.push(episode);
+      this._repeatSearchEpisode(episode);
+    }
+  });
+};
+
+// Returns an array of all upcoming (in the next day or already released) episodes
+// out of a collection or episode.
+Dispatcher.prototype._getUpcomingEpisodes = function(item) {
+  let isUpcoming = item => item.type === 'episode' && item.releaseDate &&
+    item.releaseDate.toDateString() <= new Date().toDateString();
+  if (isUpcoming(item)) {
+    return item;
+  } else if (item.type === 'collection') {
+    return item.episodes.filter(ep => isUpcoming(ep));
+  } else {
+    return [];
+  }
+};
+
+// Repeatedly searched for an upcoming episode according to the repeat array in settings.
+Dispatcher.prototype._repeatSearchEpisode = function(episode) {
+  let schedule = settings.monitor.repeat;
+  let now = new Date();
+  // Difference in minutes between now and the release date.
+  let diff = (now - episode.releaseDate) / 60000;
+  let acc = 0;
+  for (let i = 0; diff > acc && i < schedule.length; i++) {
+    acc += schedule[i];
+  }
+  if (diff <= acc) {
+    // Repeat search array has ended, remove from searching and resolve search Promise chain.
+    util.removeFirst(this.searching, episode);
+    return Promise.resolve();
+  }
+  // Delay until the next check time.
+  return Promise.delay((acc - diff) * 60 * 1000)
+  .then(() => {
+    // If the episode is still in the searching array, look for it and repeat on failure.
+    if (this.searching.includes(episode)) {
+      return this.searchMonitoredItem(episode)
+      .then(() => this._repeatSearchEpisode(episode));
+    }
+  });
+};
 
 // Returns the length of the filtered monitor array.
 Dispatcher.prototype.searchMonitored = function(optFilter) {
@@ -116,6 +183,11 @@ Dispatcher.prototype.searchMonitored = function(optFilter) {
     }
     return interested.length;
   });
+};
+
+Dispatcher.prototype.searchMonitoredItem = function(item) {
+  let swiper = this.swipers[item.swiperId];
+  swiper.queueDownload(item, true);
 };
 
 Dispatcher.prototype.readMemory = function() {
@@ -167,6 +239,8 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
         return finalArr;
       }
     })
+    // Trigger an event when monitored is written successfully.
+    .tap(() => this.trigger(`${target}-${method}`, item))
     .catch(err => {
       console.log('updateMemory err:', err);
       return `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +

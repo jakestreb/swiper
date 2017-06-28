@@ -125,7 +125,7 @@ exports.torrentSearch = torrentSearch;
 
 // Save a video in the correct directory, adding any necessary directories.
 function exportVideo(video) {
-  let dirs = video.getType() === 'movie' ? ['movies'] :
+  let dirs = video.getType() === 'movie' ? ['movies', video.getSafeTitle()] :
     ['tv', video.getSafeTitle(), `Season ${video.seasonNum}`];
   return Promise.reduce(dirs, (acc, dir) => {
     // Check if all directories exist along the way, creating them if they don't.
@@ -255,3 +255,13 @@ function _getTimeString(date) {
   let ampm = hours < 12 ? 'am' : 'pm';
   return `${hours % 12 || 12}:${minutesStr}${ampm}`;
 }
+
+// Removes the first index of the item from the array.
+function removeFirst(arr, item, optEqualityFunc) {
+  optEqualityFunc = optEqualityFunc || ((a, b) => a === b);
+  let index = arr.findIndex(arrItem => optEqualityFunc(item, arrItem));
+  if (index > -1) {
+    arr.splice(index, 1);
+  }
+}
+exports.removeFirst = removeFirst;

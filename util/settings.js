@@ -17,12 +17,13 @@ module.exports = {
   },
   // Low seeder tier to determine download pick quality. Things with fewer seeders than this
   // will still be downloaded, but as a last priority.
-  minSeeders: 20,
+  minSeeders: 30,
   monitor: {
-    hour: 22, // 0-23, hour at which monitored should be searched.
-    minute: 30,  // 0-59, minute after the hour at which monitored should be searched.
-    // Minutes in each repeat interval. Stops retrying when the end of the array is reached.
-    repeat: [15, 15, 15, 15, 15, 15, 15, 15, 30, 30, 30, 30, 60, 60]
+    hour: 2, // 0-23, hour at which monitored should be searched for all items.
+    // Minutes in each repeat interval after release. Stops retrying when the end of the array is
+    // reached. When Swiper is started up, there's an immediate search for TV shows released in the
+    // past 24 hours, then array search begins starting in the correct place.
+    repeat: [45, 15, 15, 15, 15, 15, 15, 15, 15, 30, 30, 30, 30, 60, 60, 60, 60, 120, 120, 240, 480]
   },
   displayTorrents: 4, // Number of torrents to show at a time after searching.
   maxDownloads: 3 // Concurrent downloads allowed per swiper instance.

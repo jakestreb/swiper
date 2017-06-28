@@ -8,8 +8,8 @@ const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
 
-// TODO: Take advantage of release times and duration for auto-searching.
-// TODO: Allow new commands to short circuit conversations.
+// TODO: Keep track of recently downloaded items, allow blacklisting and re-adding
+//  to monitored.
 
 // TODO: Figure out why there are so many listeners on client.add.
 // TODO: Create readme (heroku address, how to check ips, etc).
@@ -56,30 +56,33 @@ Swiper.prototype.awaitResponse = function(message, possible) {
 };
 
 Swiper.prototype._awaitResponse = function(message, possible, callCount) {
+  let input;
+  let failMessage = callCount > 0 ? message : `I'm not sure I understand. ${message}`;
   return this.awaitInput(message)
-  .then(input => {
+  .then(_input => {
+    input = _input;
     let matched = null;
     possible.forEach(resp => {
       if (input.match(resp.regex)) {
         if (!matched) {
           matched = resp.value;
         } else {
+          // Matched multiple responses at once, no good.
           throw new InputError();
         }
       }
     });
     if (!matched) {
-      throw new InputError();
+      // If no response matches occur, allow short-circuiting with a new command.
+      // This may still fail and trigger an InputError.
+      return this.parseCommand(input, failMessage);
     }
     return {
       input: input,
       match: matched
     };
   })
-  .catch(InputError, () => {
-    return this._awaitResponse(callCount > 0 ? message :
-      "I'm not sure I understand. " + message, possible, callCount + 1);
-  });
+  .catch(InputError, () => this._awaitResponse(failMessage, possible, callCount + 1));
 };
 
 Swiper.prototype.awaitCommand = function(message) {
@@ -97,7 +100,7 @@ Swiper.prototype.awaitCommand = function(message) {
   });
 };
 
-Swiper.prototype.parseCommand = function(input) {
+Swiper.prototype.parseCommand = function(input, optFailMessage) {
   // Calls the function mapped to the command in COMMANDS with the content
   // following the command.
   let [req, rem] = this._splitFirst(input);
@@ -105,7 +108,7 @@ Swiper.prototype.parseCommand = function(input) {
   if (cmd && cmd.func) {
     return this[cmd.func](rem);
   } else {
-    throw new InputError('Not recognized. Type "help" to see what I can do.');
+    throw new InputError(optFailMessage || 'Not recognized. Type "help" to see what I can do.');
   }
 };
 
@@ -271,7 +274,8 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
 Swiper.prototype._startDownload = function(video, noPrompt) {
   // Remove the video from monitoring and queueing, if it was in those places.
   if (!noPrompt) {
-    this.send(`Download starting. Type "abort" to stop, or "status" to view progess.`);
+    this.send(`Downloading ${video.torrent.getName()}.\n\n` +
+      `Type "abort" to stop, or "status" to view progess.`);
   }
   this._removeContent(video, true, true);
   this.downloading.push(video);
@@ -288,10 +292,8 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
     this._downloadFromQueue();
   })
   .catch(() => {
-    this.send(`${video.getDesc()} download process died, restarting download.`);
-    // Destroy the tfile, since it will be re-set.
-    video.torrent.tfile.destroy();
-    this._startDownload(video, noPrompt);
+    this.send(`${video.getDesc()} download process died, likely a bad torrent.`);
+    this._cancelDownload(video);
   });
 };
 
@@ -630,17 +632,8 @@ Swiper.prototype._removePrefix = function(str, prefix) {
   return str.slice(0, l) === prefix ? str.slice(l) : null;
 };
 
-// Removes the first index of the item from the array.
-Swiper.prototype._removeFirst = function(arr, item, optEqualityFunc) {
-  optEqualityFunc = optEqualityFunc || ((a, b) => a === b);
-  let index = arr.findIndex(arrItem => optEqualityFunc(item, arrItem));
-  if (index > -1) {
-    arr.splice(index, 1);
-  }
-};
-
 Swiper.prototype._popDownload = function(video) {
-  this._removeFirst(this.downloading, video, (a, b) => a.containsAny(b));
+  util.removeFirst(this.downloading, video, (a, b) => a.containsAny(b));
 };
 
 Swiper.prototype._captureSeason = function(str) {
