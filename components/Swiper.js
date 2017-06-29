@@ -116,17 +116,20 @@ Swiper.prototype.getStatus = function() {
   let indentFunc = item => (item.swiperId === this.id ? '* ' : '  ');
   return this.dispatcher.readMemory()
   .then(memory => {
-    return "\nMonitoring:\n" +
-      (memory.monitored.map(item => {
-        let nextAirs = item.type === 'collection' ? item.getNextAirs() : null;
-        return indentFunc(item) + item.getDesc() + (nextAirs ? `  (${item.getNextAirs()})` : '');
-      }).join("\n") || "None") + "\n\n" +
-      "Queued:\n" +
-      (memory.queued.map(item => indentFunc(item) + item.getDesc())
-        .join("\n") || "None") + "\n\n" +
-      "Downloading:\n" +
-      (this.downloading.reduce((acc, val) =>
-        acc + indentFunc(val) + val.torrent.getDownloadInfo() + "\n", "") || "None\n");
+    let mstr = memory.monitored.map(item => {
+      let nextAirs = item.type === 'collection' ? item.getNextAirs() : null;
+      return indentFunc(item) + item.getDesc() + (nextAirs ? `  (${item.getNextAirs()})` : '');
+    }).join("\n");
+    let qstr = memory.queued.map(item => indentFunc(item) + item.getDesc()).join("\n");
+    let dstr = this.downloading.reduce((acc, val) => {
+      return acc + indentFunc(val) + val.torrent.getDownloadInfo() + "\n";
+    }, "");
+    if (!mstr && !qstr && !dstr) {
+      return "Nothing to report.";
+    }
+    return (mstr ? `\nMonitoring:\n${mstr}\n` : '')
+     + (qstr ? `\nQueued:\n${qstr}\n` : '')
+     + (dstr ? `\nDownloading:\n${dstr}\n` : '');
   });
 };
 

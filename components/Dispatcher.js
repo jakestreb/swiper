@@ -16,12 +16,15 @@ const Collection = require('./Collection.js');
 const settings = require('../util/settings.js');
 const util = require('../util/util.js');
 
+// Time after release (ms) that an episode is no longer 'upcoming'.
+const EPISODE_YIELD_TIME = settings.newEpisodeBackoff.reduce((a, b) => a + b, 0) * 60 * 1000;
+
 function Dispatcher(respondFuncs) {
   this.respondFuncs = respondFuncs;
   this.swipers = {};
   this.downloading = [];
-  // Monitored episodes that are currently actively being searched for.
-  this.searching = [];
+  // Monitored episodes that are currently or will soon actively be searched for.
+  this.upcoming = [];
 
   // Lock should be acquired before reading/writing memory.json
   this.memoryLock = new AsyncLock({
@@ -48,7 +51,7 @@ function Dispatcher(respondFuncs) {
   this.on('monitored-remove', item => {
     let upcoming = this._getUpcomingEpisodes(item);
     upcoming.forEach(ep => {
-      util.removeFirst(this.searching, ep);
+      util.removeFirst(this.upcoming, ep);
     });
   });
 }
@@ -87,7 +90,7 @@ Dispatcher.prototype.startMonitoring = function() {
   const DAY = 86400000;
   let now = new Date();
   let untilSearchTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
-    settings.monitor.hour) - now;
+    settings.monitorAt) - now;
   // If the time has passed, add a full day.
   return Promise.delay(untilSearchTime < 0 ? untilSearchTime + DAY : untilSearchTime)
   .then(() => {
@@ -115,8 +118,9 @@ Dispatcher.prototype.startSearchingUpcomingEpisodes = function() {
 Dispatcher.prototype._addUpcomingToSearch = function(item) {
   let search = this._getUpcomingEpisodes(item);
   search.forEach(episode => {
-    if (!this.searching.includes(episode)) {
-      this.searching.push(episode);
+    if (!this.upcoming.includes(episode)) {
+      console.log(`Adding ${episode.getDesc()} to upcoming`);
+      this.upcoming.push(episode);
       this._repeatSearchEpisode(episode);
     }
   });
@@ -125,8 +129,10 @@ Dispatcher.prototype._addUpcomingToSearch = function(item) {
 // Returns an array of all upcoming (in the next day or already released) episodes
 // out of a collection or episode.
 Dispatcher.prototype._getUpcomingEpisodes = function(item) {
-  let isUpcoming = item => item.type === 'episode' && item.releaseDate &&
-    item.releaseDate.toDateString() <= new Date().toDateString();
+  const oneDay = 1000 * 60 * 60 * 24;
+  let now = new Date();
+  let isUpcoming = item => (item.type === 'episode') && item.releaseDate &&
+    ((item.releaseDate - now) <= oneDay) && ((now - item.releaseDate) < EPISODE_YIELD_TIME);
   if (isUpcoming(item)) {
     return item;
   } else if (item.type === 'collection') {
@@ -138,24 +144,26 @@ Dispatcher.prototype._getUpcomingEpisodes = function(item) {
 
 // Repeatedly searched for an upcoming episode according to the repeat array in settings.
 Dispatcher.prototype._repeatSearchEpisode = function(episode) {
-  let schedule = settings.monitor.repeat;
+  const schedule = settings.newEpisodeBackoff;
   let now = new Date();
   // Difference in minutes between now and the release date.
-  let diff = (now - episode.releaseDate) / 60000;
-  let acc = 0;
-  for (let i = 0; diff > acc && i < schedule.length; i++) {
+  let diff = Math.floor((now - episode.releaseDate) / 60000);
+  let acc = schedule[0];
+  for (let i = 1; diff > acc && i < schedule.length; i++) {
     acc += schedule[i];
   }
-  if (diff <= acc) {
+  if (diff > acc) {
     // Repeat search array has ended, remove from searching and resolve search Promise chain.
-    util.removeFirst(this.searching, episode);
+    util.removeFirst(this.upcoming, episode);
     return Promise.resolve();
   }
   // Delay until the next check time.
+  console.log(`Searching ${episode.getDesc()} in ${(acc - diff)} minutes`);
   return Promise.delay((acc - diff) * 60 * 1000)
   .then(() => {
     // If the episode is still in the searching array, look for it and repeat on failure.
-    if (this.searching.includes(episode)) {
+    if (this.upcoming.includes(episode)) {
+      console.log(`Searching ${episode.getDesc()}`);
       return this.searchMonitoredItem(episode)
       .then(() => this._repeatSearchEpisode(episode));
     }
@@ -170,7 +178,6 @@ Dispatcher.prototype.searchMonitored = function(optFilter) {
   .then(memory => {
     let interested = memory.monitored.filter(item => optFilter(item));
     interested.forEach(item => {
-      console.log('Searching for ' + item.getDesc());
       let swiper = this.swipers[item.swiperId];
       owners[swiper.id] = owners[swiper.id] || [];
       owners[swiper.id].push(item);

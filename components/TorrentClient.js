@@ -25,8 +25,16 @@ TorrentClient.prototype.download = function(torrent) {
   return new Promise((resolve, reject) => {
     this.client.add(torrent.getMagnet(), { path: downloadDir }, tfile => {
       torrent.setProgressFile(tfile);
-      tfile.once('done', () => { resolve(torrent); });
-      tfile.once('error', () => { reject(torrent); });
+      tfile.once('done', () => {
+        // TODO: Is removing listeners necessary?
+        tfile.removeAllListeners();
+        resolve(torrent);
+      });
+      tfile.once('error', () => {
+        // TODO: Is removing listeners necessary?
+        tfile.removeAllListeners();
+        reject(torrent);
+      });
     });
   });
 };
