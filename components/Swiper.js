@@ -10,6 +10,7 @@ const commands = require('../util/commands.js');
 
 // TODO: Keep track of recently downloaded items, allow blacklisting and re-adding
 //  to monitored.
+// TODO: Automatically create memory.json file if not found.
 
 // TODO: Figure out why there are so many listeners on client.add.
 // TODO: Create readme (heroku address, how to check ips, etc).
@@ -140,12 +141,10 @@ Swiper.prototype.monitor = function(input) {
 
 Swiper.prototype._monitorContent = function(content) {
   return Promise.try(() => {
-    if (!content.isVideo()) {
-      return content.getInitialType() === 'series' ? this._resolveMonitorSeries(content) :
-        this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
-    } else {
-      return this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
+    if (!content.isVideo() && content.getInitialType() === 'series') {
+      return this._resolveMonitorSeries(content);
     }
+    return this.dispatcher.updateMemory(this.id, 'monitored', 'add', content);
   });
 };
 

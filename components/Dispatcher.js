@@ -3,8 +3,9 @@
 const _ = require('underscore');
 const Promise = require('bluebird');
 const BackboneEvents = require('backbone-events-standalone');
-const AsyncLock = require('async-lock');
+const onExit = require('signal-exit');
 const fs = require('fs');
+const lockFile = Promise.promisifyAll(require('lockfile'));
 const readFile = Promise.promisify(fs.readFile);
 const writeFile = Promise.promisify(fs.writeFile);
 
@@ -18,6 +19,12 @@ const util = require('../util/util.js');
 
 // Time after release (ms) that an episode is no longer 'upcoming'.
 const EPISODE_YIELD_TIME = settings.newEpisodeBackoff.reduce((a, b) => a + b, 0) * 60 * 1000;
+const LOCK_PATH = 'util/memory.lock';
+
+// When the process exists, unlock the file.
+onExit(() => {
+  lockFile.unlockSync(LOCK_PATH);
+});
 
 function Dispatcher(respondFuncs) {
   this.respondFuncs = respondFuncs;
@@ -25,12 +32,6 @@ function Dispatcher(respondFuncs) {
   this.downloading = [];
   // Monitored episodes that are currently or will soon actively be searched for.
   this.upcoming = [];
-
-  // Lock should be acquired before reading/writing memory.json
-  this.memoryLock = new AsyncLock({
-    Promise: Promise,
-    timeout: 5000
-  });
 
   this.torrentClient = new TorrentClient(() => {
     // TODO: Restart all the downloads that were in progess, and tell the users.
@@ -57,13 +58,18 @@ function Dispatcher(respondFuncs) {
 }
 _.extend(Dispatcher.prototype, BackboneEvents);
 
+Dispatcher.prototype.lock = function() {
+  return lockFile.lockAsync(LOCK_PATH, { wait: 5000, stale: 4500 });
+};
+
+Dispatcher.prototype.unlock = function() {
+  return lockFile.unlockAsync(LOCK_PATH);
+};
+
 Dispatcher.prototype.initFacebookSwipers = function() {
-  return this.memoryLock.acquire('key', () => {
-    return readFile('util/memory.json', 'utf8');
-  })
-  .then(file => {
-    let fileObj = JSON.parse(file);
-    fileObj.swipers.forEach(id => {
+  return this.readMemory()
+  .then(memory => {
+    memory.swipers.forEach(id => {
       this.swipers[id] = new Swiper(this, id, this.respondFuncs.facebook);
     });
   });
@@ -103,13 +109,11 @@ Dispatcher.prototype.startMonitoring = function() {
 
 // Adds any upcoming episodes to the search array and prepares to check for them.
 Dispatcher.prototype.startSearchingUpcomingEpisodes = function() {
-  return Promise.try(() => {
-    return this.readMemory()
-    .then(memory => {
-      // Iterate through monitored, adding all upcoming episodes to searching.
-      memory.monitored.forEach(item => {
-        this._addUpcomingToSearch(item);
-      });
+  return this.readMemory()
+  .then(memory => {
+    // Iterate through monitored, adding all upcoming episodes to searching.
+    memory.monitored.forEach(item => {
+      this._addUpcomingToSearch(item);
     });
   });
 };
@@ -198,27 +202,28 @@ Dispatcher.prototype.searchMonitoredItem = function(item) {
 };
 
 Dispatcher.prototype.readMemory = function() {
-  return this.memoryLock.acquire('key', () => {
-    return readFile('util/memory.json', 'utf8');
-  })
+  return this.lock()
+  .then(() => readFile('util/memory.json', 'utf8'))
+  .finally(() => this.unlock())
   .then(file => {
     let fileObj = JSON.parse(file);
     return {
       monitored: this._parseContent(fileObj.monitored),
-      queued: this._parseContent(fileObj.queued)
+      queued: this._parseContent(fileObj.queued),
+      swipers: fileObj.swipers
     };
   });
 };
 
 Dispatcher.prototype.saveSwiper = function(id) {
-  return this.memoryLock.acquire('key', () => {
-    return readFile('util/memory.json', 'utf8')
-    .then(file => {
-      let fileObj = JSON.parse(file);
-      fileObj.swipers.push(id);
-      return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2));
-    });
-  });
+  return this.lock()
+  .then(() => readFile('util/memory.json', 'utf8'))
+  .then(file => {
+    let fileObj = JSON.parse(file);
+    fileObj.swipers.push(id);
+    return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2));
+  })
+  .finally(() => this.unlock());
 };
 
 Dispatcher.prototype._parseContent = function(arr) {
@@ -231,29 +236,30 @@ Dispatcher.prototype._parseContent = function(arr) {
  * target: 'monitored'|'queued'
  */
 Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
-  return this.memoryLock.acquire('key', () => {
-    return readFile('util/memory.json', 'utf8')
-    .then(file => {
-      let fileObj = JSON.parse(file);
-      let t = this._parseContent(fileObj[target]);
-      let finalArr = method === 'add' ? this._addToArray(swiperId, t, item) :
-        this._removeFromArray(swiperId, t, item);
-      fileObj[target] = t.map(item => item.getObject());
-      if (Array.isArray(finalArr)) {
-        return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2))
-          .then(() => `Added to ${target}.`);
-      } else {
-        return finalArr;
-      }
-    })
-    // Trigger an event when monitored is written successfully.
-    .tap(() => this.trigger(`${target}-${method}`, item))
-    .catch(err => {
-      console.log('updateMemory err:', err);
-      return `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +
-        `${target}.` : `removing ${item.getTitle()} from ${target}.`}`;
-    });
-  });
+  return this.lock()
+  .then(() => readFile('util/memory.json', 'utf8'))
+  .then(file => {
+    let fileObj = JSON.parse(file);
+    let t = this._parseContent(fileObj[target]);
+    let finalArr = method === 'add' ? this._addToArray(swiperId, t, item) :
+      this._removeFromArray(swiperId, t, item);
+    fileObj[target] = t.map(item => item.getObject());
+    // finalArr is either an array or a failure message.
+    if (Array.isArray(finalArr)) {
+      return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2))
+        .then(() => `Added to ${target}.`);
+    } else {
+      return finalArr;
+    }
+  })
+  // Trigger an event when monitored is written successfully.
+  .tap(() => this.trigger(`${target}-${method}`, item))
+  .catch(err => {
+    console.log('updateMemory err:', err);
+    return `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +
+      `${target}.` : `removing ${item.getTitle()} from ${target}.`}`;
+  })
+  .tap(() => this.unlock());
 };
 
 // Consolidate add with an item in the array with the same title, or just adds it.
