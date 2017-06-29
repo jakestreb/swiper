@@ -58,10 +58,12 @@ function Dispatcher(respondFuncs) {
 }
 _.extend(Dispatcher.prototype, BackboneEvents);
 
+// Locks the memory file, should be called before reading/writing.
 Dispatcher.prototype.lock = function() {
   return lockFile.lockAsync(LOCK_PATH, { wait: 5000, stale: 4500 });
 };
 
+// Unlocks the memory file, should be called after reading/writing.
 Dispatcher.prototype.unlock = function() {
   return lockFile.unlockAsync(LOCK_PATH);
 };
