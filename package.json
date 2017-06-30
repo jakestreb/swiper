@@ -12,6 +12,7 @@
     "backbone-events-standalone": "^0.2.7",
     "bluebird": "^3.4.7",
     "dotenv": "^4.0.0",
+    "express": "^4.15.3",
     "is-online": "^6.1.0",
     "lockfile": "^1.0.3",
     "node-tvdb": "^3.1.1",
