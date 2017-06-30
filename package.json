@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "download helper",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test-server": "node test-server.js"
   },
   "author": "jake",
   "dependencies": {
