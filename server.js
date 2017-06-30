@@ -5,11 +5,15 @@ const Promise = require('bluebird');
 const rp = require("request-promise");
 const rimraf = require("rimraf");
 const rimrafAsync = Promise.promisify(rimraf);
+const express = require("express");
+const bodyParser = require("body-parser");
+
+const app = express();
 
 const Dispatcher = require('./components/Dispatcher.js');
 
-const gatewayUrl = process.env.GATEWAY_URL || 'https://limitless-island-56260.herokuapp.com/swiper';
-const reqTimeout = 20000;
+const port = process.env.PORT || 8250;
+const maxLength = 640;
 
 // Delete everything in downloads folder.
 rimrafAsync('./downloads/*').then(err => {
@@ -18,52 +22,118 @@ rimrafAsync('./downloads/*').then(err => {
   }
 });
 
-function longPoll() {
-  return gatewayGet()
-  .then(resp => {
-    // console.log('Received messages from the gateway: ' + resp);
-    let data = JSON.parse(resp);
-    if (data.messages) {
-      data.messages.forEach(item => {
-        let message = item.message;
-        let id = item.id;
-        // Send the message to the dispatcher, which will route it to the correct Swiper.
-        // Respond by POSTing to the gateway.
-        dispatcher.acceptMessage('facebook', id, message);
-      });
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
+app.use(bodyParser.json());
+
+app.get("/", (req, res) => {
+  res.send('Running');
+});
+
+// Get request from facebook to establish endpoint
+app.get("/facebook", (req, res) => {
+  if (req.query['hub.mode'] === "subscribe" && req.query['hub.challenge']) {
+    if (req.query['hub.verify_token'] !== process.env.VERIFY_TOKEN) {
+      res.send("Verification token mismatch");
     }
-  })
-  .catch(err => {
-    // console.warn('Request for messages failed:' , err.message);
-  })
-  .then(() => longPoll());
+    res.send(req.query['hub.challenge']);
+  }
+  res.send('Unrecognized request');
+});
+
+// Message from facebook
+app.post("/facebook", (req, res) => {
+  let data = req.body;
+  if (data.object === 'page') {
+    data.entry.forEach(entry => {
+      entry.messaging.forEach(messageEvent => {
+        if (messageEvent.message) {
+          // Message
+          let senderId = messageEvent.sender.id;
+          // let recipientId = messageEvent.recipient.id;
+          let text = messageEvent.message.text;
+          dispatcher.acceptMessage('facebook', senderId, text);
+        } else if (messageEvent.delivery) {
+          // Delivery confirmation
+        } else if (messageEvent.optin) {
+          // Opt in confirmation
+        } else if (messageEvent.postback) {
+          // User clicked postback button in earlier message
+        }
+      });
+    });
+  }
+  res.send('ok');
+});
+
+app.listen(port, () => {
+  console.log(`Listening on port ${port}`);
+});
+
+function sendFacebookMessage(id, text) {
+  console.log(`Sending message to ${id}: ${text}`);
+  let chunks = text.split('\n\n');
+  // Split the text up if it's too long for Facebook.
+  let tooLong = true;
+  while (tooLong) {
+    tooLong = false;
+    let newArr = [];
+    chunks.forEach(str => {
+      if (str.length > maxLength) {
+        // An element is too long, gotta loop through again.
+        tooLong = true;
+        let nSplit = str.split('\n');
+        if (nSplit.length > 1) {
+          // This could work, try it. But clean up the split pieces first.
+          nSplit = nSplit.map(str => str.trim()).filter(str => str.length > 0);
+          newArr = newArr.concat(nSplit);
+        } else {
+          // This isn't working, just cut it in half.
+          let halfLen = str.length / 2;
+          newArr.push(str.substring(0, halfLen));
+          newArr.push(str.substring(halfLen));
+        }
+      } else {
+        newArr.push(str);
+      }
+    });
+    chunks = newArr;
+  }
+  // Send all the chunks
+  return _sendFacebookMessages(id, chunks);
 }
 
-
-// GET request to gateway.
-function gatewayGet() {
-  // console.log('Requesting messages from the gateway: ' + new Date());
-  return rp({
-    url: gatewayUrl,
-    method: 'GET',
-    timeout: reqTimeout
-  });
+// Send an array of text messages in sequence.
+function _sendFacebookMessages(id, messageArray) {
+  return messageArray.reduce((acc, str) => {
+    return acc.then(() => {
+      return rp({
+        url: 'https://graph.facebook.com/v2.6/me/messages',
+        qs: {
+          access_token: process.env.PAGE_ACCESS_TOKEN
+        },
+        method: 'POST',
+        json: {
+          recipient: {
+            id: id
+          },
+          message: {
+            text: str
+          },
+        }
+      });
+    })
+    .catch(err => {
+      console.warn(err);
+    });
+  }, Promise.resolve());
 }
 
-// POST request to gateway.
-function gatewayPost(json) {
-  // console.log('Posting messages to gateway: ' + new Date());
-  return rp({
-    url: gatewayUrl,
-    method: 'POST',
-    json: json
-  });
-}
-
-// For now, start the Dispatcher and listen on the command line.
+// Start the Dispatcher.
 let dispatcher = new Dispatcher({
   cli: (msg, id) => { console.log(msg); },
-  facebook: (msg, id) => { gatewayPost({ id: id, message: msg }); }
+  facebook: (msg, id) => { sendFacebookMessage(id, msg); }
 });
 
 // Initialize command line Swiper.
@@ -73,6 +143,3 @@ process.stdin.on('data', text => {
   // Resolve with the text minus /r/n
   dispatcher.acceptMessage('cli', 'cli', text.trim());
 });
-
-// Start long polling the gateway for Facebook messages.
-longPoll();
