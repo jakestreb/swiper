@@ -5,6 +5,7 @@ const Promise = require('bluebird');
 const BackboneEvents = require('backbone-events-standalone');
 const onExit = require('signal-exit');
 const fs = require('fs');
+const rimrafAsync = Promise.promisify(require('rimraf'));
 const lockFile = Promise.promisifyAll(require('lockfile'));
 const readFile = Promise.promisify(fs.readFile);
 const writeFile = Promise.promisify(fs.writeFile);
@@ -20,6 +21,14 @@ const util = require('../util/util.js');
 // Time after release (ms) that an episode is no longer 'upcoming'.
 const EPISODE_YIELD_TIME = settings.newEpisodeBackoff.reduce((a, b) => a + b, 0) * 60 * 1000;
 const LOCK_PATH = 'util/memory.lock';
+
+// Remove the lock file and any stale locks on start, if they exist.
+rimrafAsync(LOCK_PATH + '*')
+.then(err => {
+  if (err) {
+    console.error(err);
+  }
+});
 
 // When the process exists, unlock the file.
 onExit(() => {

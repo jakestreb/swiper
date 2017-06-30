@@ -159,7 +159,7 @@ function exportVideo(video) {
       // Remove all file subdirectorys.
       rimrafAsync(path.join(tfilePath, dir)).then(err => {
         if (err) {
-          console.warn(err);
+          console.error(err);
         }
       });
     });
