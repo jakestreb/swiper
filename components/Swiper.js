@@ -1,5 +1,6 @@
 'use strict';
 
+const _ = require('underscore');
 const Promise = require('bluebird');
 const isOnline = require('is-online');
 const InputError = require('./InputError.js');
@@ -370,6 +371,8 @@ Swiper.prototype._removeContent = function(content, ignoreDownloading, hidePromp
   let prompts = [];
   return this.dispatcher.readMemory()
   .then(memory => {
+    // The swipers are not content.
+    memory = _.omit(memory, 'swipers');
     // Note that video here may refer to an entire season or series.
     // Handle monitored and queued.
     for (let name in memory) {
