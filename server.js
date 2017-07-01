@@ -12,6 +12,7 @@ const app = express();
 
 const Dispatcher = require('./components/Dispatcher.js');
 
+const gatewayUrl = process.env.GATEWAY_URL;
 const port = process.env.PORT || 8250;
 const maxLength = 640;
 
@@ -31,39 +32,11 @@ app.get("/", (req, res) => {
   res.send('Running');
 });
 
-// Get request from facebook to establish endpoint
-app.get("/facebook", (req, res) => {
-  if (req.query['hub.mode'] === "subscribe" && req.query['hub.challenge']) {
-    if (req.query['hub.verify_token'] !== process.env.VERIFY_TOKEN) {
-      res.send("Verification token mismatch");
-    }
-    res.send(req.query['hub.challenge']);
-  }
-  res.send('Unrecognized request');
-});
-
 // Message from facebook
 app.post("/facebook", (req, res) => {
-  let data = req.body;
-  if (data.object === 'page') {
-    data.entry.forEach(entry => {
-      entry.messaging.forEach(messageEvent => {
-        if (messageEvent.message) {
-          // Message
-          let senderId = messageEvent.sender.id;
-          // let recipientId = messageEvent.recipient.id;
-          let text = messageEvent.message.text;
-          dispatcher.acceptMessage('facebook', senderId, text);
-        } else if (messageEvent.delivery) {
-          // Delivery confirmation
-        } else if (messageEvent.optin) {
-          // Opt in confirmation
-        } else if (messageEvent.postback) {
-          // User clicked postback button in earlier message
-        }
-      });
-    });
-  }
+  let id = req.body.id;
+  let message = req.body.message;
+  dispatcher.acceptMessage('facebook', id, message);
   res.send('ok');
 });
 
@@ -109,18 +82,11 @@ function _sendFacebookMessages(id, messageArray) {
   return messageArray.reduce((acc, str) => {
     return acc.then(() => {
       return rp({
-        url: 'https://graph.facebook.com/v2.6/me/messages',
-        qs: {
-          access_token: process.env.PAGE_ACCESS_TOKEN
-        },
+        url: gatewayUrl,
         method: 'POST',
         json: {
-          recipient: {
-            id: id
-          },
-          message: {
-            text: str
-          },
+          id: id,
+          message: str
         }
       });
     })
