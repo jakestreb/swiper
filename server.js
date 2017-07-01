@@ -45,7 +45,7 @@ app.listen(port, () => {
 });
 
 function sendFacebookMessage(id, text) {
-  console.log(`Sending message to ${id}: ${text}`);
+  // console.log(`Sending message to ${id}: ${text}`);
   let chunks = text.split('\n\n');
   // Split the text up if it's too long for Facebook.
   let tooLong = true;
@@ -82,7 +82,7 @@ function _sendFacebookMessages(id, messageArray) {
   return messageArray.reduce((acc, str) => {
     return acc.then(() => {
       return rp({
-        uri: gatewayUrl,
+        uri: `${gatewayUrl}/facebook`,
         method: 'POST',
         json: {
           id: id,
