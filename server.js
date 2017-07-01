@@ -12,7 +12,7 @@ const app = express();
 
 const Dispatcher = require('./components/Dispatcher.js');
 
-const gatewayUrl = process.env.GATEWAY_URL;
+const gatewayUrl = 'https://limitless-island-56260.herokuapp.com';
 const port = process.env.PORT || 8250;
 const maxLength = 640;
 
@@ -82,7 +82,7 @@ function _sendFacebookMessages(id, messageArray) {
   return messageArray.reduce((acc, str) => {
     return acc.then(() => {
       return rp({
-        url: gatewayUrl,
+        uri: gatewayUrl,
         method: 'POST',
         json: {
           id: id,
