@@ -59,8 +59,13 @@ function Dispatcher(respondFuncs) {
   });
   // When an item is removed from monitored, remove any upcoming episodes involved from searching.
   this.on('monitored-remove', item => {
-    let upcoming = this._getUpcomingEpisodes(item);
-    upcoming.forEach(ep => {
+    let episodes = [];
+    if (item.type === 'collection') {
+      episodes = item.episodes;
+    } else if (item.type === 'episode') {
+      episodes = [item];
+    }
+    episodes.forEach(ep => {
       util.removeFirst(this.upcoming, ep);
     });
   });
