@@ -82,7 +82,7 @@ function _sendFacebookMessages(id, messageArray) {
   return messageArray.reduce((acc, str) => {
     return acc.then(() => {
       return rp({
-        uri: `${gatewayUrl}/facebook`,
+        uri: `${gatewayUrl}/swiper`,
         method: 'POST',
         json: {
           id: id,
