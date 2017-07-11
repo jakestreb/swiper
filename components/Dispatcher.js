@@ -116,7 +116,10 @@ Dispatcher.prototype.startMonitoring = function() {
   // If the time has passed, add a full day.
   return Promise.delay(untilSearchTime < 0 ? untilSearchTime + DAY : untilSearchTime)
   .then(() => {
-    this.searchMonitored();
+    // Don't search episodes that haven't been released yet.
+    this.searchMonitored(item =>
+      (item.type !== 'episode') || (item.releaseDate && item.releaseDate <= new Date())
+    );
     // This is called daily to add newly upcoming episodes to be searched.
     this.startSearchingUpcomingEpisodes();
   })
