@@ -117,9 +117,7 @@ Dispatcher.prototype.startMonitoring = function() {
   return Promise.delay(untilSearchTime < 0 ? untilSearchTime + DAY : untilSearchTime)
   .then(() => {
     // Don't search episodes that haven't been released yet.
-    this.searchMonitored(item =>
-      (item.type !== 'episode') || (item.releaseDate && item.releaseDate <= new Date())
-    );
+    this.searchMonitored();
     // This is called daily to add newly upcoming episodes to be searched.
     this.startSearchingUpcomingEpisodes();
   })
@@ -149,6 +147,19 @@ Dispatcher.prototype._addUpcomingToSearch = function(item) {
   });
 };
 
+// Returns an array of all released episodes out of a collection or episode.
+Dispatcher.prototype._getReleasedEpisodes = function(item) {
+  let now = new Date();
+  let isReleased = item => (item.type === 'episode') && item.releaseDate && (now > item.releaseDate);
+  if (isReleased(item)) {
+    return [item];
+  } else if (item.type === 'collection') {
+    return item.episodes.filter(ep => isReleased(ep));
+  } else {
+    return [];
+  }
+};
+
 // Returns an array of all upcoming (in the next day or already released) episodes
 // out of a collection or episode.
 Dispatcher.prototype._getUpcomingEpisodes = function(item) {
@@ -157,7 +168,7 @@ Dispatcher.prototype._getUpcomingEpisodes = function(item) {
   let isUpcoming = item => (item.type === 'episode') && item.releaseDate &&
     ((item.releaseDate - now) <= oneDay) && ((now - item.releaseDate) < EPISODE_YIELD_TIME);
   if (isUpcoming(item)) {
-    return item;
+    return [item];
   } else if (item.type === 'collection') {
     return item.episodes.filter(ep => isUpcoming(ep));
   } else {
@@ -194,16 +205,19 @@ Dispatcher.prototype._repeatSearchEpisode = function(episode) {
 };
 
 // Returns the length of the filtered monitor array.
-Dispatcher.prototype.searchMonitored = function(optFilter) {
-  optFilter = optFilter || (item => item);
+Dispatcher.prototype.searchMonitored = function() {
   let owners = {};
   return this.readMemory()
   .then(memory => {
-    let interested = memory.monitored.filter(item => optFilter(item));
+    let interested = memory.monitored;
     interested.forEach(item => {
-      let swiper = this.swipers[item.swiperId];
-      owners[swiper.id] = owners[swiper.id] || [];
-      owners[swiper.id].push(item);
+      // TODO: Currently considers all movies to be released
+      let released = (item.type === 'movie') ? [item] : this._getReleasedEpisodes(item);
+      released.forEach(releasedItem => {
+        let swiper = this.swipers[item.swiperId];
+        owners[swiper.id] = owners[swiper.id] || [];
+        owners[swiper.id].push(item);
+      });
     });
     for (let id in owners) {
       // Make swipers find whichever items they added in sequence.

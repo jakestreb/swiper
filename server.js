@@ -45,6 +45,10 @@ app.listen(port, () => {
 });
 
 function sendFacebookMessage(id, text) {
+  if (!text || typeof text !== 'string') {
+    console.error('Attempted to send non-String to Facebook:', text);
+    return;
+  }
   // console.log(`Sending message to ${id}: ${text}`);
   let chunks = text.split('\n\n');
   // Split the text up if it's too long for Facebook.
