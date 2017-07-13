@@ -214,6 +214,7 @@ Dispatcher.prototype.searchMonitored = function() {
       // TODO: Currently considers all movies to be released
       let released = (item.type === 'movie') ? [item] : this._getReleasedEpisodes(item);
       released.forEach(releasedItem => {
+        console.log('Monitor searching:', releasedItem.getDesc());
         let swiper = this.swipers[item.swiperId];
         owners[swiper.id] = owners[swiper.id] || [];
         owners[swiper.id].push(item);
