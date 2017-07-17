@@ -232,7 +232,7 @@ Dispatcher.prototype.searchMonitored = function() {
 
 Dispatcher.prototype.searchMonitoredItem = function(item) {
   let swiper = this.swipers[item.swiperId];
-  swiper.queueDownload(item, true);
+  return swiper.queueDownload(item, true);
 };
 
 Dispatcher.prototype.readMemory = function() {
