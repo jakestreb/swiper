@@ -41,7 +41,9 @@ Torrent.prototype.isEligible = function(type) {
 Torrent.prototype.getTier = function(type) {
   let qs = settings.quality[type].length;
   let qIndex = settings.quality[type].findIndex(q => this.name.match(q));
-  if (qIndex === -1) {
+  // Check if any insta-reject strings match (ex. CAMRip).
+  let rejectMatch = settings.reject.find(r => this.name.match(r));
+  if (qIndex === -1 || rejectMatch) {
     return 0;
   }
   // If its a TV episode that hasn't been released, it's no good.
