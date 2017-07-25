@@ -7,7 +7,7 @@ module.exports = {
   },
   reject: [/\bHDCAM\b/gi, /\bCAMRip\b/gi, /\bCAM\b/gi, /\bTS\b/gi, /\bTELESYNC\b/gi,
     /\bPDVD\b/gi, /\bHDTS\b/gi, /\bHD-TS\b/gi, /\bHDTC\b/gi, /\bHD-TC\b/gi, /\bWP\b/gi,
-    /\bWORKPRINT\b/gi],
+    /\bWORKPRINT\b/gi, /SUB\b/gi, /SUBS\b/gi, /\bKOREAN\b/gi, /\bKOR\b/gi],
   // Maximum and minimum sizes to automatically download content, in Mb
   size: {
     episode: {
