@@ -199,6 +199,7 @@ Dispatcher.prototype._repeatSearchEpisode = function(episode) {
     if (this.upcoming.includes(episode)) {
       console.log(`Searching ${episode.getDesc()}`);
       return this.searchMonitoredItem(episode)
+	  .delay(60 * 1000)	// After searching, always delay 1 minute before re-scheduling to prevent an endless loop.
       .then(() => this._repeatSearchEpisode(episode));
     }
   });
