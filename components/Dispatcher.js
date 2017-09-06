@@ -46,8 +46,8 @@ function Dispatcher(respondFuncs) {
     // TODO: Restart all the downloads that were in progess, and tell the users.
   });
 
-  // Create established Facebook swipers.
-  this.initFacebookSwipers();
+  // Create established swipers.
+  this.initSwipers();
 
   // Start monitoring items.
   this.startMonitoring();
@@ -82,11 +82,11 @@ Dispatcher.prototype.unlock = function() {
   return lockFile.unlockAsync(LOCK_PATH);
 };
 
-Dispatcher.prototype.initFacebookSwipers = function() {
+Dispatcher.prototype.initSwipers = function() {
   return this.readMemory()
   .then(memory => {
-    memory.swipers.forEach(id => {
-      this.swipers[id] = new Swiper(this, id, this.respondFuncs.facebook);
+    memory.swipers.forEach(swiper => {
+      this.swipers[swiper.id] = new Swiper(this, swiper.id, this.respondFuncs[swiper.type]);
     });
   });
 };
@@ -99,8 +99,8 @@ Dispatcher.prototype.acceptMessage = function(type, id, message) {
   } else {
     // New swiper
     this.swipers[id] = new Swiper(this, id, this.respondFuncs[type]);
-    if (type === 'facebook') {
-      this.saveSwiper(id);
+    if (type !== 'cli') {
+      this.saveSwiper(type, id);
     }
   }
 };
@@ -249,12 +249,15 @@ Dispatcher.prototype.readMemory = function() {
   });
 };
 
-Dispatcher.prototype.saveSwiper = function(id) {
+Dispatcher.prototype.saveSwiper = function(type, id) {
   return this.lock()
   .then(() => readFile('util/memory.json', 'utf8'))
   .then(file => {
     let fileObj = JSON.parse(file);
-    fileObj.swipers.push(id);
+    fileObj.swipers.push({
+      type: type,
+      id: id
+    });
     return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2));
   })
   .finally(() => this.unlock());

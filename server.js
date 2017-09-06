@@ -45,13 +45,21 @@ app.post("/facebook", (req, res) => {
   res.send('ok');
 });
 
+// Message from telegram
+app.post("/telegram", (req, res) => {
+  let id = req.body.id;
+  let message = req.body.message;
+  dispatcher.acceptMessage('telegram', id, message);
+  res.send('ok');
+});
+
 app.listen(port, () => {
   console.log(`Listening on port ${port}`);
 });
 
-function sendFacebookMessage(id, text) {
+function sendEndpointMessage(id, text, destination) {
   if (!text || typeof text !== 'string') {
-    console.error('Attempted to send non-String to Facebook:', text);
+    console.error('Attempted to send non-String to endpoint:', text);
     return;
   }
   // console.log(`Sending message to ${id}: ${text}`);
@@ -83,11 +91,11 @@ function sendFacebookMessage(id, text) {
     chunks = newArr;
   }
   // Send all the chunks
-  return _sendFacebookMessages(id, chunks);
+  return _sendEndpointMessages(id, chunks, destination);
 }
 
 // Send an array of text messages in sequence.
-function _sendFacebookMessages(id, messageArray) {
+function _sendEndpointMessages(id, messageArray, destination) {
   return messageArray.reduce((acc, str) => {
     return acc.then(() => {
       return rp({
@@ -95,7 +103,8 @@ function _sendFacebookMessages(id, messageArray) {
         method: 'POST',
         json: {
           id: id,
-          message: str
+          message: str,
+          destination: destination
         }
       });
     })
@@ -108,7 +117,8 @@ function _sendFacebookMessages(id, messageArray) {
 // Start the Dispatcher.
 let dispatcher = new Dispatcher({
   cli: (msg, id) => { console.log(msg); },
-  facebook: (msg, id) => { sendFacebookMessage(id, msg); }
+  facebook: (msg, id) => { sendEndpointMessage(id, msg, 'facebook'); },
+  telegram: (msg, id) => { sendEndpointMessage(id, msg, 'telegram'); },
 });
 
 // Initialize command line Swiper.
