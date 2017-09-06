@@ -9,7 +9,6 @@ const resp = require('../util/responses.js');
 const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
-const memwatch = require('memwatch-next');
 
 // TODO: Keep track of recently downloaded items, allow blacklisting and re-adding
 //  to monitored.
@@ -213,8 +212,6 @@ Swiper.prototype.download = function(input) {
 // If noPrompt is set, no prompts will be offered to the user.
 // NOTE: This is usually called before the torrent is found, but may be called after it is selected.
 Swiper.prototype.queueDownload = function(content, noPrompt) {
-  // Take first snapshot
-  this.hd = new memwatch.HeapDiff();
   let addCount = settings.maxDownloads - this.downloadCount;
   let ready = [];
   let queueItem = null;
@@ -300,9 +297,6 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
     // Download and transfer complete, 'cancel' the download.
     this._cancelDownload(video);
     this.send(`${video.getDesc()} download complete!`);
-    // Take the second snapshot and compute the diff
-    var diff = this.hd.end();
-    console.warn('Search heap diff', diff);
     // Cancel download to destroy the tfile.
     // Try to download the next item in this swiper's queue.
     this.downloadCount--;
