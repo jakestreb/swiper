@@ -619,7 +619,7 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
 Swiper.prototype._autoPickTorrent = function(torrents, type) {
   let best = null;
   let bestTier = 0;
-  torrents.forEach(torrent => {
+  torrents.slice(0, type === 'movie' ? 8 : 12).forEach(torrent => {
     let tier = torrent.getTier(type);
     if (tier > bestTier) {
       best = torrent;
