@@ -8,6 +8,7 @@ const resp = require('../util/responses.js');
 const util = require('../util/util.js');
 const settings = require('../util/settings.js');
 const commands = require('../util/commands.js');
+const memwatch = require('memwatch-next');
 
 // TODO: Keep track of recently downloaded items, allow blacklisting and re-adding
 //  to monitored.
@@ -421,6 +422,9 @@ Swiper.prototype._cancelDownload = function(video) {
 };
 
 Swiper.prototype.search = function(input) {
+  // Take first snapshot
+  var hd = new memwatch.HeapDiff();
+
   return isOnline().then(online => {
     if (!online) {
       return `I don't have a good internet connection right now. Try again in a few minutes.`;
@@ -435,6 +439,11 @@ Swiper.prototype.search = function(input) {
         }
       });
     }
+  })
+  .then(() => {
+    // Take the second snapshot and compute the diff
+    var diff = hd.end();
+    console.warn('Search heap diff', diff);
   });
 };
 

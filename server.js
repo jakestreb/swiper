@@ -7,6 +7,7 @@ const rimraf = require("rimraf");
 const rimrafAsync = Promise.promisify(rimraf);
 const express = require("express");
 const bodyParser = require("body-parser");
+const memwatch = require('memwatch-next');
 
 const app = express();
 
@@ -15,6 +16,10 @@ const Dispatcher = require('./components/Dispatcher.js');
 const gatewayUrl = 'https://limitless-island-56260.herokuapp.com';
 const port = process.env.PORT || 8250;
 const maxLength = 640;
+
+memwatch.on('leak', info => {
+  console.log('Potential memory leak detected', info);
+});
 
 // Delete everything in downloads folder.
 rimrafAsync('./downloads/*').then(err => {
