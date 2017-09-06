@@ -4,6 +4,7 @@ const _ = require('underscore');
 const Promise = require('bluebird');
 const isOnline = require('is-online');
 const InputError = require('./InputError.js');
+const AbortError = require('./AbortError.js');
 const resp = require('../util/responses.js');
 const util = require('../util/util.js');
 const settings = require('../util/settings.js');
@@ -48,9 +49,13 @@ Swiper.prototype.awaitInput = function(optMessage) {
   return new Promise((resolve, reject) => {
     this.toSwiper = resolve;
   })
-  .then(input => input.toLowerCase() === 'cancel' ?
-    this.awaitCommand('Ok, nevermind.') : input
-  );
+  .then(input => {
+    if (input.toLowerCase() === 'cancel') {
+      throw new AbortError('ok');
+    } else {
+      return input;
+    }
+  });
 };
 
 // possible is an array of possible entries from /util/responses.js
@@ -92,15 +97,18 @@ Swiper.prototype.awaitCommand = function(message) {
   return this.awaitInput(message)
   .then(input => this.parseCommand(input))
   .then(doneStr => this.awaitCommand(doneStr))
-  .catch(InputError, e => {
-    this.send(e.message);
-    return this.awaitCommand();
-  })
+  .catch(AbortError, e => this._handleError(e))
+  .catch(InputError, e => this._handleError(e))
   .catch(e => {
     console.error(e);
     this.send('Something went wrong. What do you need?');
     return this.awaitCommand();
   });
+};
+
+Swiper.prototype._handleError = function(err) {
+  this.send(err.message);
+  return this.awaitCommand();
 };
 
 Swiper.prototype.parseCommand = function(input, optFailMessage) {
@@ -190,7 +198,7 @@ Swiper.prototype.check = function() {
 Swiper.prototype.download = function(input) {
   return isOnline().then(online => {
     if (!online) {
-      return `I don't have a good connection right now. Try again in a few minutes.`;
+      return `I don't have a good connection right now. Try again in a minute.`;
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
@@ -205,6 +213,8 @@ Swiper.prototype.download = function(input) {
 // If noPrompt is set, no prompts will be offered to the user.
 // NOTE: This is usually called before the torrent is found, but may be called after it is selected.
 Swiper.prototype.queueDownload = function(content, noPrompt) {
+  // Take first snapshot
+  this.hd = new memwatch.HeapDiff();
   let addCount = settings.maxDownloads - this.downloadCount;
   let ready = [];
   let queueItem = null;
@@ -290,6 +300,9 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
     // Download and transfer complete, 'cancel' the download.
     this._cancelDownload(video);
     this.send(`${video.getDesc()} download complete!`);
+    // Take the second snapshot and compute the diff
+    var diff = this.hd.end();
+    console.warn('Search heap diff', diff);
     // Cancel download to destroy the tfile.
     // Try to download the next item in this swiper's queue.
     this.downloadCount--;
@@ -422,10 +435,7 @@ Swiper.prototype._cancelDownload = function(video) {
 };
 
 Swiper.prototype.search = function(input) {
-  // Take first snapshot
-  var hd = new memwatch.HeapDiff();
-
-  return isOnline().then(online => {
+  return Promise.try(() => isOnline()).then(online => {
     if (!online) {
       return `I don't have a good internet connection right now. Try again in a few minutes.`;
     } else {
@@ -439,11 +449,6 @@ Swiper.prototype.search = function(input) {
         }
       });
     }
-  })
-  .then(() => {
-    // Take the second snapshot and compute the diff
-    var diff = hd.end();
-    console.warn('Search heap diff', diff);
   });
 };
 
