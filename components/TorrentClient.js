@@ -26,13 +26,11 @@ TorrentClient.prototype.download = function(torrent) {
     this.client.add(torrent.getMagnet(), { path: downloadDir }, tfile => {
       torrent.setProgressFile(tfile);
       tfile.once('done', () => {
-        // TODO: Is removing listeners necessary?
-        tfile.removeAllListeners();
+        torrent.removeDownloadFiles();
         resolve(torrent);
       });
       tfile.once('error', () => {
-        // TODO: Is removing listeners necessary?
-        tfile.removeAllListeners();
+        torrent.removeDownloadFiles();
         reject(torrent);
       });
     });

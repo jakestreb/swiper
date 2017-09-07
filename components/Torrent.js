@@ -58,17 +58,27 @@ Torrent.prototype.getTier = function(type) {
   return size ? (qs - qIndex) + (qs * (this.seeders >= settings.minSeeders ? 1 : 0)) : 0;
 };
 
-Torrent.prototype.cancelDownload = function() {
-  this.tfile.files.map(file => {
+Torrent.prototype.removeDownloadFiles = function() {
+  // Get all the paths that should be deleted.
+  let paths = [];
+  this.tfile.files.forEach(file => {
     let fileDir = file.path.split('/').shift();
     let origPath = path.join(this.tfile.path, fileDir);
-    rimrafAsync(origPath).then(err => {
-      if (err) {
-        console.warn(err);
-      }
-    });
+    if (!paths.includes(origPath)) {
+      paths.push(origPath);
+    }
   });
-  this.tfile.destroy();
+  // Delete all the paths.
+  return Promise.map(paths, p => {
+    return rimrafAsync(p)
+    .then(err => {
+      if (err) { console.error(err); }
+    });
+  })
+  .then(() => {
+    // Destory this torrent file.
+    this.tfile.destroy();
+  });
 };
 
 Torrent.prototype.getDownloadInfo = function() {

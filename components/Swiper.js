@@ -293,8 +293,8 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
   this.torrentClient.download(video.torrent)
   .then(() => util.exportVideo(video))
   .then(() => {
-    // Download and transfer complete, 'cancel' the download.
-    this._cancelDownload(video);
+    // Download and transfer complete.
+    this._popDownload(video);
     this.send(`${video.getDesc()} download complete!`);
     // Cancel download to destroy the tfile.
     // Try to download the next item in this swiper's queue.
@@ -360,8 +360,7 @@ Swiper.prototype._commandDetail = function(cmd) {
 // Aborts the all current downloads.
 Swiper.prototype.abort = function() {
   this.downloading.filter(video => video.swiperId === this.id).forEach(video => {
-    this._popDownload(video);
-    video.torrent.cancelDownload();
+    this._cancelDownload(video);
   });
   this.downloadCount = 0;
   // Download the next things in the queue.
@@ -423,7 +422,7 @@ Swiper.prototype._confirmAction = function(promptText, callback, optYes) {
 };
 
 Swiper.prototype._cancelDownload = function(video) {
-  video.torrent.cancelDownload();
+  video.torrent.removeDownloadFiles();
   this._popDownload(video);
 };
 
