@@ -589,11 +589,11 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
   }
   let prevNext = '';
   if (next && !prev) {
-    prevNext = ' or use "next" to see more options';
+    prevNext = '\nuse "next" to see more options';
   } else if (prev && !next) {
-    prevNext = ' or use "prev" to see more options';
+    prevNext = '\nuse "prev" to see more options';
   } else if (prev && next) {
-    prevNext = ' or use "prev" or "next" to see more options';
+    prevNext = '\nuse "prev" or "next" to see more options';
   }
   return this.awaitResponse(
     `${activeTorrents.reduce((acc, t, i) => `${acc}${startIndex + i + 1} - ${t.toString()}`, "")}` +
