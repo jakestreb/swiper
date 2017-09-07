@@ -41,11 +41,11 @@ function identifyContent(swiperId, options) {
   })
   .catch(err => {
     console.log('OMDB err:', err);
-    throw new Error("It looks like the Open Movie Database is down. Try again in a little while.");
+    throw new Error("I can't access the Open Movie Database, try again in a minute");
   })
   .then(omdbEntry => {
     if (!omdbEntry) {
-      throw new Error("I can't find anything like that.");
+      throw new Error("I don't know what that is, try being very explicit with spelling");
     } else if (omdbEntry.type === 'movie') {
       // Movie
       return new Movie(swiperId, omdbEntry.title, omdbEntry.year);

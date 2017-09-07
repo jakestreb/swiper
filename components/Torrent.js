@@ -72,23 +72,35 @@ Torrent.prototype.cancelDownload = function() {
 };
 
 Torrent.prototype.getDownloadInfo = function() {
+  let prettyName = '';
+  let splitName = this.name.split('.');
+  let acc = 0;
+  // Create a pretty name by truncating the torrent name
+  for (let i = 0; i < splitName.length; i++) {
+    let word = splitName[i];
+    prettyName += word;
+    acc += word.length;
+    if (acc < 30) {
+      prettyName += ' ';
+    } else {
+      prettyName += '...';
+      break;
+    }
+  }
   if (!this.tfile) {
-    return this.name + "\n";
+    return `${prettyName} (pending)\n`;
   } else {
-    return this.name + "\n" +
-      "    Peers: " + this.tfile.numPeers + "\n" +
-      "    Speed: " + (this.tfile.downloadSpeed / 1000000).toPrecision(3) + " Mb/s\n" +
-      "    Progress: " + (this.tfile.progress * 100).toPrecision(3) + "%\n" +
-      "    Time left: " + (this.tfile.timeRemaining / 60000).toPrecision(4) + " min\n";
+    let progress = (this.tfile.progress * 100).toPrecision(3);
+    let speed = (this.tfile.downloadSpeed / 1000000).toPrecision(3);
+    let remaining = (this.tfile.timeRemaining / 60000).toPrecision(3);
+    return `${prettyName} (${progress}%)\n` +
+      `${this.tfile.numPeers}PE | ${speed}MB/s | ${remaining} min remain\n`;
   }
 };
 
 Torrent.prototype.toString = function() {
-  return this.name + "\n" +
-    "    Size: " + this.size + " Mb\n" +
-    "    SE: " + this.seeders + "\n" +
-    "    LE: " + this.leechers + "\n" +
-    "    Uploaded: " + this.uploadTime + "\n";
+  return `${this.name.replace(/\./g, ' ')} (${this.size}MB)\n` +
+    `${this.seeders}/${this.leechers} SE/LE | UP ${this.uploadTime}\n\n`;
 };
 
 // Expects a string which starts with a decimal number and either GiB, MiB, or kiB

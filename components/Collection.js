@@ -76,7 +76,7 @@ Collection.prototype.containsAll = function(content) {
   } else if (content.getType() === 'collection') {
     // Find an episode in content that is not in this.
     return !content.episodes.find(ep1 => {
-      !this.episodes.find(ep2 => ep1.equals(ep2));
+      return !this.episodes.find(ep2 => ep1.equals(ep2));
     });
   }
 };
@@ -88,7 +88,7 @@ Collection.prototype.addContent = function(content) {
     let newStuff = content.episodes.filter(ep1 => {
       return !this.episodes.find(ep2 => ep1.equals(ep2));
     });
-    this.episodes.unshift(newStuff);
+    this.episodes.unshift(...newStuff);
   }
   // Maintain episodes invariant after addition.
   this.sortEpisodes();
