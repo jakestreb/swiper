@@ -158,7 +158,7 @@ Swiper.prototype._monitorContent = function(content) {
 };
 
 Swiper.prototype._resolveMonitorSeries = function(series) {
-  return this.awaitResponse(`Use "series" to monitor the entire series or "new" to monitor new episodes only\n` +
+  return this.awaitResponse(`Use "series" to monitor the entire series,\n"new" to monitor new episodes only\n` +
     `otherwise specify the season or the season and episode`, [resp.series, resp.seasonOrEpisode, resp.new])
   .then(feedback => {
     if (feedback.match === 'series') {
@@ -285,7 +285,7 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
   // Remove the video from monitoring and queueing, if it was in those places.
   if (!noPrompt) {
     this.send(`Downloading ${video.torrent.getName()}\n\n` +
-      `Use "abort" to stop all downloads, or "status" for progess`);
+      `Use "abort" to stop all downloads,\n"status" for progess`);
   }
   this._removeContent(video, true, true);
   this.downloading.push(video);
@@ -489,7 +489,7 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
   let breadth = collection.getInitialType();
   let isSeries = breadth === 'series';
   return this.awaitResponse(`Either give the ${isSeries ? "season and " : ""}episode ` +
-    `number${isSeries ? "s" : ""} to search or "download" to get the whole ${breadth}`,
+    `number${isSeries ? "s" : ""} to search,\n"download" to get the whole ${breadth}`,
     [isSeries ? resp.seasonOrEpisode : resp.number, resp.download]
   ).then(feedback => {
     if (feedback.match === 'download') {
