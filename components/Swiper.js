@@ -132,7 +132,7 @@ Swiper.prototype.getStatus = function() {
     }).join("\n");
     let qstr = memory.queued.map(item => indentFunc(item) + item.getDesc()).join("\n");
     let dstr = this.downloading.reduce((acc, val) => {
-      return acc + indentFunc(val) + val.torrent.getDownloadInfo() + "\n";
+      return acc + val.torrent.getDownloadInfo() + "\n";
     }, "");
     if (!mstr && !qstr && !dstr) {
       return "Nothing to report";
@@ -578,7 +578,7 @@ Swiper.prototype._showTorrents = function(video, torrents, type) {
 Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex) {
   let n = settings.displayTorrents;
   let activeTorrents = torrents.slice(startIndex, startIndex + n);
-  let responses = [resp.download], prev = false, next = false;
+  let responses = [resp.number], prev = false, next = false;
   if (startIndex > 0) {
     prev = true;
     responses.push(resp.prev);
@@ -589,15 +589,15 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
   }
   let prevNext = '';
   if (next && !prev) {
-    prevNext = ' or "next" to see more options';
+    prevNext = ' or use "next" to see more options';
   } else if (prev && !next) {
-    prevNext = ' or "prev" to see more options';
+    prevNext = ' or use "prev" to see more options';
   } else if (prev && next) {
-    prevNext = ', "prev" or "next" to see more options';
+    prevNext = ' or use "prev" or "next" to see more options';
   }
   return this.awaitResponse(
     `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1} -\n` + t.toString(), "")}` +
-    `Type "download <n>"${prevNext}`, responses
+    `Give the number to download${prevNext}`, responses
   )
   .then(resp => {
     let numStr, num;
@@ -606,8 +606,8 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
         return this._showSomeTorrents(video, torrents, type, startIndex - n);
       case 'next':
         return this._showSomeTorrents(video, torrents, type, startIndex + n);
-      case 'download':
-        [numStr] = this._execCapture(resp.input, /\bd(?:ownload)?\s*(\d)/gi, 1);
+      case 'number':
+        [numStr] = this._execCapture(resp.input, /([0-9]+)/gi, 1);
         if (!numStr) {
           return this._showSomeTorrents(video, torrents, type, startIndex);
         }

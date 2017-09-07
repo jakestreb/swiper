@@ -88,19 +88,19 @@ Torrent.prototype.getDownloadInfo = function() {
     }
   }
   if (!this.tfile) {
-    return `${prettyName}\n`;
+    return `${prettyName} (pending)\n`;
   } else {
     let progress = (this.tfile.progress * 100).toPrecision(3);
     let speed = (this.tfile.downloadSpeed / 1000000).toPrecision(3);
     let remaining = (this.tfile.timeRemaining / 60000).toPrecision(3);
-    return `(${progress}%) ${prettyName}\n` +
-      `${this.tfile.numPeers}PE | ${speed}MB/s | ${remaining}min remain\n`;
+    return `${prettyName} (${progress}%)\n` +
+      `${this.tfile.numPeers}PE | ${speed}MB/s | ${remaining} min remain\n`;
   }
 };
 
 Torrent.prototype.toString = function() {
-  return `${this.name.replace('.', ' ')} (${this.size}MB)\n` +
-    `${this.seeders}SE/${this.leechers}LE | UP ${this.uploadTime}\n\n`;
+  return `${this.name.replace(/\./g, ' ')} (${this.size}MB)\n` +
+    `${this.seeders}/${this.leechers} SE/LE | UP ${this.uploadTime}\n\n`;
 };
 
 // Expects a string which starts with a decimal number and either GiB, MiB, or kiB
