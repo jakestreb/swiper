@@ -596,7 +596,7 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
     prevNext = ' or use "prev" or "next" to see more options';
   }
   return this.awaitResponse(
-    `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1} -\n` + t.toString(), "")}` +
+    `${activeTorrents.reduce((acc, t, i) => `${acc}${startIndex + i + 1} - ${t.toString()}`, "")}` +
     `Give the number to download${prevNext}`, responses
   )
   .then(resp => {

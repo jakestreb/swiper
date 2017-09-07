@@ -94,13 +94,13 @@ Torrent.prototype.getDownloadInfo = function() {
     let speed = (this.tfile.downloadSpeed / 1000000).toPrecision(3);
     let remaining = (this.tfile.timeRemaining / 60000).toPrecision(3);
     return `${prettyName} (${progress}%)\n` +
-      `${this.tfile.numPeers}PE | ${speed}MB/s | ${remaining} min remain\n`;
+      `${this.tfile.numPeers} peers | ${speed}MB/s | ${remaining} min remain\n`;
   }
 };
 
 Torrent.prototype.toString = function() {
   return `${this.name.replace(/\./g, ' ')} (${this.size}MB)\n` +
-    `${this.seeders}/${this.leechers} SE/LE | UP ${this.uploadTime}\n\n`;
+    `${this.seeders} seed | ${this.leechers} leech | ${this.uploadTime}\n\n`;
 };
 
 // Expects a string which starts with a decimal number and either GiB, MiB, or kiB
