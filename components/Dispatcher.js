@@ -284,7 +284,7 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
     // finalArr is either an array or a failure message.
     if (Array.isArray(finalArr)) {
       return writeFile('util/memory.json', JSON.stringify(fileObj, null, 2))
-        .then(() => `Added to ${target}.`);
+        .then(() => `Added to ${target}`);
     } else {
       return finalArr;
     }
@@ -294,7 +294,7 @@ Dispatcher.prototype.updateMemory = function(swiperId, target, method, item) {
   .catch(err => {
     console.log('updateMemory err:', err);
     return `There was a problem ${method === 'add' ? `adding ${item.getTitle()} to ` +
-      `${target}.` : `removing ${item.getTitle()} from ${target}.`}`;
+      `${target}` : `removing ${item.getTitle()} from ${target}`}`;
   })
   .tap(() => this.unlock());
 };
@@ -305,13 +305,13 @@ Dispatcher.prototype._addToArray = function(swiperId, arr, add) {
   let index = arr.findIndex(existing => existing.getTitle() === add.getTitle());
   let typeA = add.getType();
   if (typeA === 'collection' && add.episodes.length === 0) {
-    return `There are currently no such episodes.`;
+    return `There are currently no such episodes`;
   } else if (index > -1) {
     let sameTitle = arr[index];
     let typeB = sameTitle.getType();
     if (typeA === 'movie' && typeB === 'movie') {
       // Both are movies. Already present.
-      return `${add.getDesc()} is already there.`;
+      return `${add.getDesc()} is already there`;
     } else if ((typeA === 'movie' || typeB === 'movie') && typeA !== typeB) {
       // One of them is a movie, the other is a show.
       arr.unshift(add);
@@ -319,7 +319,7 @@ Dispatcher.prototype._addToArray = function(swiperId, arr, add) {
     } else if (typeA === 'episode' && typeB === 'episode') {
       // Both are episodes.
       if (add.equals(sameTitle)) {
-        return `${add.getDesc()} is already there.`;
+        return `${add.getDesc()} is already there`;
       } else {
         let clc = new Collection(swiperId, add.getTitle(), [add, sameTitle]);
         arr.splice(index, 1, clc);
@@ -335,7 +335,7 @@ Dispatcher.prototype._addToArray = function(swiperId, arr, add) {
         return arr;
       }
       if (clc.containsAll(ep)) {
-        return `${add.getDesc()} is already there.`;
+        return `${add.getDesc()} is already there`;
       } else {
         clc.addContent(ep);
         return arr;
@@ -343,7 +343,7 @@ Dispatcher.prototype._addToArray = function(swiperId, arr, add) {
     } else {
       // Both are collections.
       if (sameTitle.containsAll(add)) {
-        return `${add.getDesc()} is already there.`;
+        return `${add.getDesc()} is already there`;
       } else {
         sameTitle.addContent(add);
         return arr;
@@ -369,14 +369,14 @@ Dispatcher.prototype._removeFromArray = function(swiperId, arr, remove) {
       return arr;
     } else if ((typeA === 'movie' || typeB === 'movie') && typeA !== typeB) {
       // One of them is a movie, the other is a show.
-      return `${remove.getDesc()} is not there.`;
+      return `${remove.getDesc()} is not there`;
     } else if (typeA === 'episode' && typeB === 'episode') {
       // Both are episodes.
       if (remove.equals(sameTitle)) {
         arr.splice(index, 1);
         return arr;
       } else {
-        return `${remove.getDesc()} is not there.`;
+        return `${remove.getDesc()} is not there`;
       }
     } else if (typeA === 'episode' && typeB === 'collection') {
       // Remove an episode from a collection.
@@ -387,7 +387,7 @@ Dispatcher.prototype._removeFromArray = function(swiperId, arr, remove) {
         }
         return arr;
       } else {
-        return `${remove.getDesc()} is not there.`;
+        return `${remove.getDesc()} is not there`;
       }
     } else if (typeA === 'collection' && typeB === 'episode') {
       // Remove a collection, but only an episode is present.
@@ -395,7 +395,7 @@ Dispatcher.prototype._removeFromArray = function(swiperId, arr, remove) {
         arr.splice(index, 1);
         return arr;
       } else {
-        return `${remove.getDesc()} is not there.`;
+        return `${remove.getDesc()} is not there`;
       }
     } else {
       // Both are collections.
@@ -406,12 +406,12 @@ Dispatcher.prototype._removeFromArray = function(swiperId, arr, remove) {
         }
         return arr;
       } else {
-        return `${remove.getDesc()} is not there.`;
+        return `${remove.getDesc()} is not there`;
       }
     }
   } else {
     // Nothing with the same title found.
-    return `${remove.getTitle()} is not there.`;
+    return `${remove.getTitle()} is not there`;
   }
 };
 

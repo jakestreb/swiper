@@ -50,7 +50,7 @@ Swiper.prototype.awaitInput = function(optMessage) {
   })
   .then(input => {
     if (input.toLowerCase() === 'cancel') {
-      throw new AbortError('ok');
+      throw new AbortError('Ok');
     } else {
       return input;
     }
@@ -64,7 +64,7 @@ Swiper.prototype.awaitResponse = function(message, possible) {
 
 Swiper.prototype._awaitResponse = function(message, possible, callCount) {
   let input;
-  let failMessage = callCount > 0 ? message : `I'm not sure I understand. ${message}`;
+  let failMessage = callCount > 0 ? message : `I don't understand\n\n${message}`;
   return this.awaitInput(message)
   .then(_input => {
     input = _input;
@@ -118,12 +118,12 @@ Swiper.prototype.parseCommand = function(input, optFailMessage) {
   if (cmd && cmd.func) {
     return this[cmd.func](rem);
   } else {
-    throw new InputError(optFailMessage || 'Not recognized. Type "help" to see what I can do.');
+    throw new InputError(optFailMessage || 'Type "help" to see what I can do');
   }
 };
 
 Swiper.prototype.getStatus = function() {
-  let indentFunc = item => (item.swiperId === this.id ? '* ' : '  ');
+  let indentFunc = item => (item.swiperId === this.id ? '* ' : '- ');
   return this.dispatcher.readMemory()
   .then(memory => {
     let mstr = memory.monitored.map(item => {
@@ -135,7 +135,7 @@ Swiper.prototype.getStatus = function() {
       return acc + indentFunc(val) + val.torrent.getDownloadInfo() + "\n";
     }, "");
     if (!mstr && !qstr && !dstr) {
-      return "Nothing to report.";
+      return "Nothing to report";
     }
     return (mstr ? `\nMonitoring:\n${mstr}\n` : '')
      + (qstr ? `\nQueued:\n${qstr}\n` : '')
@@ -158,9 +158,8 @@ Swiper.prototype._monitorContent = function(content) {
 };
 
 Swiper.prototype._resolveMonitorSeries = function(series) {
-  return this.awaitResponse(`Type "series" to monitor the entire series, otherwise specify ` +
-    `the season, or also the episode, you'd like monitored. To monitor new episodes only, ` +
-    `type "new".`, [resp.series, resp.seasonOrEpisode, resp.new])
+  return this.awaitResponse(`Use "series" to monitor the entire series or "new" to monitor new episodes only\n` +
+    `otherwise specify the season or the season and episode`, [resp.series, resp.seasonOrEpisode, resp.new])
   .then(feedback => {
     if (feedback.match === 'series') {
       // Series
@@ -170,7 +169,7 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
       let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
       if (!season) {
-        this.send(`I don't understand. Try something like "season 1" or "s1 e2".`);
+        this.send(`I don't understand, you have to format it like "season 1" or "s1 e2"`);
         return this._resolveMonitorSeries(series);
       } else if (season && !episode) {
         // All season
@@ -191,13 +190,13 @@ Swiper.prototype._resolveMonitorSeries = function(series) {
 
 Swiper.prototype.check = function() {
   return this.dispatcher.searchMonitored()
-  .then(() => 'Search in progress.');
+  .then(() => 'Search in progress');
 };
 
 Swiper.prototype.download = function(input) {
   return isOnline().then(online => {
     if (!online) {
-      return `I don't have a good connection right now. Try again in a minute.`;
+      return `I can't connect right now, try again in a minute`;
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
@@ -235,7 +234,7 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
           if (!content.isVideo() && !success) {
             // For collection download requests, monitor failures.
             if (!noPrompt) {
-              this.send(`Failed to find ${video.getDesc()}, adding to monitored.`);
+              this.send(`Failed to find ${video.getDesc()}, adding to monitored`);
             }
             this._monitorContent(video);
             this._downloadFromQueue();
@@ -255,8 +254,8 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
   .then(torrents => {
     let best = this._autoPickTorrent(torrents, video.getType());
     if (torrents.length === 0) {
-      return noPrompt ? false : this.awaitResponse(`I can't find any torrents right now. ` +
-        `Would you like me to try again? Otherwise, type "monitor" and I'll keep an eye out ` +
+      return noPrompt ? false : this.awaitResponse(`I can't find any torrents. ` +
+        `Should I try again? If not, you can also type "monitor" and I'll keep an eye out ` +
         `for ${video.getDesc()}`, [resp.monitor, resp.yes, resp.no])
         .then(resp => {
           return resp.match === 'yes' ? this._resolveVideoDownload(video) :
@@ -285,8 +284,8 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
 Swiper.prototype._startDownload = function(video, noPrompt) {
   // Remove the video from monitoring and queueing, if it was in those places.
   if (!noPrompt) {
-    this.send(`Downloading ${video.torrent.getName()}.\n\n` +
-      `Type "abort" to stop, or "status" to view progess.`);
+    this.send(`Downloading ${video.torrent.getName()}\n\n` +
+      `Use "abort" to stop all downloads, or "status" for progess`);
   }
   this._removeContent(video, true, true);
   this.downloading.push(video);
@@ -303,7 +302,7 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
     this._downloadFromQueue();
   })
   .catch(() => {
-    this.send(`${video.getDesc()} download process died, likely a bad torrent.`);
+    this.send(`${video.getDesc()} download process died, likely a bad torrent`);
     this._cancelDownload(video);
   });
 };
@@ -335,14 +334,14 @@ Swiper.prototype.getCommands = function(optCommand) {
     return this._commandDetail(optCommand);
   }
   let output = 'Commands:\n' + Object.keys(commands).filter(cmd => !commands[cmd].isAlias).join(', ') +
-    '\n\nType "help <command>" for details.';
+    '\n\nType "help <command>" for details';
   return output;
 };
 
 Swiper.prototype._commandDetail = function(cmd) {
   let cmdInfo = commands[cmd.toLowerCase()];
   if (!cmdInfo || cmdInfo.isAlias) {
-    return `${cmd} isn't something I respond to.`;
+    return `${cmd} isn't something I respond to`;
   } else {
     let arg = cmdInfo.arg ? ' ' + cmdInfo.arg : '';
     let out = `${cmd}${arg}:  ${cmdInfo.desc}\n\n`;
@@ -367,7 +366,7 @@ Swiper.prototype.abort = function() {
   this.downloadCount = 0;
   // Download the next things in the queue.
   this._downloadFromQueue(settings.maxDownload);
-  return 'Aborted current downloads.';
+  return 'Aborted current downloads';
 };
 
 Swiper.prototype.remove = function(input) {
@@ -405,9 +404,9 @@ Swiper.prototype._removeContent = function(content, ignoreDownloading, hidePromp
       return prompts.reduce((acc, prompt) => {
         return acc.then(() => prompt());
       }, Promise.resolve())
-      .then(() => 'Got it.');
+      .then(() => 'Got it');
     } else {
-      return `${content.getDesc()} is not being monitored, queued or downloaded.`;
+      return `${content.getDesc()} is not being monitored, queued or downloaded`;
     }
   });
 };
@@ -431,7 +430,7 @@ Swiper.prototype._cancelDownload = function(video) {
 Swiper.prototype.search = function(input) {
   return Promise.try(() => isOnline()).then(online => {
     if (!online) {
-      return `I don't have a good internet connection right now. Try again in a few minutes.`;
+      return `I can't connect right now, try again in a minute`;
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
@@ -452,8 +451,8 @@ Swiper.prototype._searchVideo = function(video) {
     if (torrents.length > 0) {
       return this._showTorrents(video, torrents);
     } else {
-      return this.awaitResponse(`I can't find any torrents right now. Would you like me to ` +
-        `try again? Otherwise type "monitor" and I'll keep an eye out for ${video.getDesc()}.`,
+      return this.awaitResponse(`I didn't find anything...try again?\n` +
+        `Or type "monitor" and I'll keep an eye out for ${video.getDesc()}`,
         [resp.monitor, resp.yes, resp.no])
       .then(feedback => {
         if (feedback.match === 'yes') {
@@ -470,11 +469,11 @@ Swiper.prototype._searchVideo = function(video) {
 // Helper for handling initial input to search and download.
 Swiper.prototype._identifyContentFromInput = function(input) {
   if (!input) {
-    throw new InputError("You didn't specify anything.");
+    throw new InputError("You didn't specify anything");
   }
   let videoData = this._parseTitle(input);
   if (!videoData.title) {
-    throw new InputError("I don't understand what the title is.");
+    throw new InputError("I don't understand what the title is");
   }
   return util.identifyContent(this.id, videoData)
   .then(content => {
@@ -489,8 +488,8 @@ Swiper.prototype._identifyContentFromInput = function(input) {
 Swiper.prototype._resolveSearchToEpisode = function(collection) {
   let breadth = collection.getInitialType();
   let isSeries = breadth === 'series';
-  return this.awaitResponse(`Give the ${isSeries ? "season and " : ""}episode ` +
-    `number${isSeries ? "s" : ""} to search or type "download" to get the whole ${breadth}.`,
+  return this.awaitResponse(`Either give the ${isSeries ? "season and " : ""}episode ` +
+    `number${isSeries ? "s" : ""} to search or "download" to get the whole ${breadth}`,
     [isSeries ? resp.seasonOrEpisode : resp.number, resp.download]
   ).then(feedback => {
     if (feedback.match === 'download') {
@@ -499,7 +498,7 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
       let season = this._captureSeason(feedback.input);
       let episode = this._captureEpisode(feedback.input);
       if (!season || !collection.hasSeason(season)) {
-        this.send(`I can't see that season of ${collection.getTitle()}.`);
+        this.send(`I can't find that season of ${collection.getTitle()}`);
         return this._resolveSearchToEpisode(collection);
       } else if (!episode) {
         collection.filterToSeason(season);
@@ -507,7 +506,7 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
       } else {
         let pickedEp = collection.getEpisode(season, episode);
         if (!pickedEp) {
-          this.send(`I'm sorry, I can't seem to find that episode.`);
+          this.send(`I can't find that episode`);
         }
         return pickedEp || this._resolveSearchToEpisode(collection);
       }
@@ -515,12 +514,12 @@ Swiper.prototype._resolveSearchToEpisode = function(collection) {
       let [ episode ] = this._execCapture(feedback.input, /([0-9]+)/gi, 1);
       episode = parseInt(episode, 10);
       if (!episode) {
-        this.send(`I don't understand.`);
+        this.send(`I don't understand`);
         return this._resolveSeasonToEpisode(collection);
       } else {
         let pickedEp = collection.getEpisode(collection.getInitialSeason(), episode);
         if (!pickedEp) {
-          this.send(`I'm sorry, I can't seem to find that episode.`);
+          this.send(`I can't find that episode`);
         }
         return pickedEp || this._resolveSearchToEpisode(collection);
       }
@@ -588,10 +587,18 @@ Swiper.prototype._showSomeTorrents = function(video, torrents, type, startIndex)
     next = true;
     responses.push(resp.next);
   }
-  let moveStr = (next || prev) ? ((prev ? '"prev", ' : '') + (next ? '"next", ' : '') + 'or ') : '';
-  return this.awaitResponse(`Found torrents:\n` +
-    `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1}. ` + t.toString(), "")}` +
-    `Type ${moveStr}"download" followed by the number of the torrent you'd like.`, responses)
+  let prevNext = '';
+  if (next && !prev) {
+    prevNext = ' or "next" to see more options';
+  } else if (prev && !next) {
+    prevNext = ' or "prev" to see more options';
+  } else if (prev && next) {
+    prevNext = ', "prev" or "next" to see more options';
+  }
+  return this.awaitResponse(
+    `${activeTorrents.reduce((acc, t, i) => acc + `${startIndex + i + 1} -\n` + t.toString(), "")}` +
+    `Type "download <n>"${prevNext}`, responses
+  )
   .then(resp => {
     let numStr, num;
     switch (resp.match) {
