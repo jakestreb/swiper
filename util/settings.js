@@ -6,8 +6,8 @@ module.exports = {
     movie: [/1080p/gi, /720p/gi]
   },
   reject: [/\bHDCAM\b/gi, /\bCAMRip\b/gi, /\bCAM\b/gi, /\bTS\b/gi, /\bTELESYNC\b/gi,
-    /\bPDVD\b/gi, /\bHDTS\b/gi, /\bHD-TS\b/gi, /\bHDTC\b/gi, /\bHD-TC\b/gi, /\bWP\b/gi,
-    /\bWORKPRINT\b/gi, /\bHC\b/gi, /\bSUB\b/gi, /\bSUBS\b/gi, /\bKORSUB\b/gi, /\bKOR\b/gi],
+    /\bPDVD\b/gi, /\bHD-?TS\b/gi, /\bHD-?TC\b/gi, /\bWP\b/gi, /\bWORKPRINT\b/gi, /\bHC\b/gi, 
+	/\bSUB\b/gi, /\bSUBS\b/gi, /\bKORSUB\b/gi, /\bKOR\b/gi, /\bTS-?RIP\b/gi],
   // Maximum and minimum sizes to automatically download content, in Mb
   size: {
     episode: {
