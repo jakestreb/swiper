@@ -26,7 +26,6 @@ TorrentClient.prototype.download = function(torrent) {
     this.client.add(torrent.getMagnet(), { path: downloadDir }, tfile => {
       torrent.setProgressFile(tfile);
       tfile.once('done', () => {
-        torrent.removeDownloadFiles();
         resolve(torrent);
       });
       tfile.once('error', () => {

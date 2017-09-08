@@ -293,7 +293,8 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
   this.torrentClient.download(video.torrent)
   .then(() => util.exportVideo(video))
   .then(() => {
-    // Download and transfer complete.
+    // Download and transfer complete. 'Cancel' the download to remove download files and pop.
+    this._cancelDownload(video);
     this.send(`${video.getDesc()} download complete!`);
     // Cancel download to destroy the tfile.
     // Try to download the next item in this swiper's queue.
@@ -302,8 +303,6 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
   })
   .catch(() => {
     this.send(`${video.getDesc()} download process died, likely a bad torrent`);
-  })
-  .then(() => {
     this._popDownload(video);
   });
 };
