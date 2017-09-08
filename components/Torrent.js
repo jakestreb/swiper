@@ -61,6 +61,11 @@ Torrent.prototype.getTier = function(type) {
 Torrent.prototype.removeDownloadFiles = function() {
   // Get all the paths that should be deleted.
   let paths = [];
+  if (!this.tfile) {
+    console.warn('Attempted to remove download files for non-existent tfile');
+    console.trace();
+    return;
+  }
   this.tfile.files.forEach(file => {
     let fileDir = file.path.split('/').shift();
     let origPath = path.join(this.tfile.path, fileDir);
