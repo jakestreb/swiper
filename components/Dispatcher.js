@@ -66,7 +66,7 @@ function Dispatcher(respondFuncs) {
       episodes = [item];
     }
     episodes.forEach(ep => {
-      util.removeFirst(this.upcoming, ep);
+      this._removeFromUpcoming(ep);
     });
   });
 }
@@ -139,7 +139,7 @@ Dispatcher.prototype.startSearchingUpcomingEpisodes = function() {
 Dispatcher.prototype._addUpcomingToSearch = function(item) {
   let search = this._getUpcomingEpisodes(item);
   search.forEach(episode => {
-    if (!this.upcoming.includes(episode)) {
+    if (!this._isInUpcoming(episode)) {
       console.log(`Adding ${episode.getDesc()} to upcoming`);
       this.upcoming.push(episode);
       this._repeatSearchEpisode(episode);
@@ -188,7 +188,7 @@ Dispatcher.prototype._repeatSearchEpisode = function(episode) {
   }
   if (diff > acc) {
     // Repeat search array has ended, remove from searching and resolve search Promise chain.
-    util.removeFirst(this.upcoming, episode);
+    this._removeFromUpcoming(episode);
     return Promise.resolve();
   }
   // Delay until the next check time.
@@ -196,13 +196,23 @@ Dispatcher.prototype._repeatSearchEpisode = function(episode) {
   return Promise.delay((acc - diff) * 60 * 1000)
   .then(() => {
     // If the episode is still in the searching array, look for it and repeat on failure.
-    if (this.upcoming.includes(episode)) {
+    if (this._isInUpcoming(episode)) {
       console.log(`Searching ${episode.getDesc()}`);
       return this.searchMonitoredItem(episode)
-	  .delay(60 * 1000)	// After searching, always delay 1 minute before re-scheduling to prevent an endless loop.
+      .delay(60 * 1000)	// After searching, always delay 1 minute before re-scheduling to prevent an endless loop.
       .then(() => this._repeatSearchEpisode(episode));
     }
   });
+};
+
+// Helper to indicate whether an episode is in the upcoming array. (Not just whether it's upcoming)
+Dispatcher.prototype._isInUpcoming = function(ep) {
+  return Boolean(this.upcoming.find(upcomingEp => upcomingEp.equals(ep)));
+};
+
+// Helper to remove an episode from the upcoming array.
+Dispatcher.prototype._removeFromUpcoming = function(ep) {
+  util.removeFirst(this.upcoming, upcomingEp => ep.equals(upcomingEp));
 };
 
 // Returns the length of the filtered monitor array.

@@ -256,10 +256,9 @@ function _getTimeString(date) {
   return `${hours % 12 || 12}:${minutesStr}${ampm}`;
 }
 
-// Removes the first index of the item from the array.
-function removeFirst(arr, item, optEqualityFunc) {
-  optEqualityFunc = optEqualityFunc || ((a, b) => a === b);
-  let index = arr.findIndex(arrItem => optEqualityFunc(item, arrItem));
+// Removes the first index which returns true from the callback from the array.
+function removeFirst(arr, callback) {
+  let index = arr.findIndex(arrItem => callback(arrItem));
   if (index > -1) {
     arr.splice(index, 1);
   }

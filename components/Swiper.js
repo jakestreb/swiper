@@ -652,7 +652,7 @@ Swiper.prototype._removePrefix = function(str, prefix) {
 };
 
 Swiper.prototype._popDownload = function(video) {
-  util.removeFirst(this.downloading, video, (a, b) => a.containsAny(b));
+  util.removeFirst(this.downloading, downloadContent => video.containsAny(downloadContent));
 };
 
 Swiper.prototype._captureSeason = function(str) {
