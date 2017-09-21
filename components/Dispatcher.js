@@ -93,16 +93,14 @@ Dispatcher.prototype.initSwipers = function() {
 
 // Sends a message to the swiper with id, or creates a new swiper if it does not exist.
 Dispatcher.prototype.acceptMessage = function(type, id, message) {
-  let swiper = this.swipers[id];
-  if (swiper) {
-    this.swipers[id].toSwiper(message);
-  } else {
+  if (!this.swipers[id]) {
     // New swiper
     this.swipers[id] = new Swiper(this, id, this.respondFuncs[type]);
     if (type !== 'cli') {
       this.saveSwiper(type, id);
     }
   }
+  this.swipers[id].toSwiper(message);
 };
 
 // Search for monitored items daily at the time given in settings.
