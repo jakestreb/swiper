@@ -10,7 +10,8 @@ function Movie(swiperId, title, year) {
 _.extend(Movie.prototype, Video.prototype);
 
 Movie.prototype.getSearchTerm = function() {
-  return this.title.replace(/[^a-zA-Z ]+/g, " ") + " " + this.year;
+  let cleanTitle = this.title.replace(/\'/g, "").replace(/[^a-zA-Z ]+/g, " ");
+  return `${cleanTitle} ${this.year}`;
 };
 
 Movie.prototype.equals = function(content) {

@@ -26,8 +26,8 @@ Episode.prototype.equals = function(ep) {
 };
 
 Episode.prototype.getSearchTerm = function() {
-  return `${this.title.replace(/[^a-zA-Z ]+/g, " ")} ` +
-    `s${util.padZeros(this.seasonNum)}e${util.padZeros(this.episodeNum)}`;
+  let cleanTitle = this.title.replace(/\'/g, "").replace(/[^a-zA-Z ]+/g, " ");
+  return `${cleanTitle} s${util.padZeros(this.seasonNum)}e${util.padZeros(this.episodeNum)}`;
 };
 
 Episode.prototype.setSeasonNum = function(seasonNum) {
