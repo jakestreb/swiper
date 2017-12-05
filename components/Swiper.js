@@ -254,21 +254,19 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
   .then(torrents => {
     let best = this._autoPickTorrent(torrents, video.getType());
     if (torrents.length === 0) {
-      return noPrompt ? false : this.awaitResponse(`I can't find any torrents. ` +
-        `Should I try again? If not, you can also type "monitor" and I'll keep an eye out ` +
-        `for ${video.getDesc()}`, [resp.monitor, resp.yes, resp.no])
-        .then(resp => {
-          return resp.match === 'yes' ? this._resolveVideoDownload(video) :
-            this._monitorContent(video);
-        });
+      return noPrompt ? false : this.awaitResponse(`No hits, try again?`,
+        [resp.monitor, resp.yes, resp.no])
+      .then(resp => {
+        if (resp.match === 'yes') {
+          return this._resolveVideoDownload(video);
+        } else if (resp.match === 'monitor') {
+          this._monitorContent(video);
+        }
+        return "Ok";
+      });
     } else if (!best) {
-      return noPrompt ? false : this.awaitResponse(`I can't find a good torrent. If you'd like ` +
-        `to see the results for yourself, type "search", otherwise type "monitor" and I'll ` +
-        `keep an eye out for ${video.getTitle()}`, [resp.search, resp.monitor])
-        .then(resp => {
-          return resp.match === 'search' ? this._searchVideo(video) :
-            this._monitorContent(video);
-        });
+      // If no best was found automatically (and a prompt is allowed), show the torrents.
+      return noPrompt ? false : this._showTorrents(video, torrents);
     } else {
       video.setTorrent(best);
       if (noPrompt) {
@@ -285,7 +283,8 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
   // Remove the video from monitoring and queueing, if it was in those places.
   if (!noPrompt) {
     this.send(`Downloading ${video.torrent.getName()}\n\n` +
-      `Use "abort" to stop all downloads,\n"status" for progess`);
+      `status - view progress\n` +
+      `abort  - cancel all downloads`);
   }
   this._removeContent(video, true, true);
   this.downloading.push(video);
@@ -334,7 +333,7 @@ Swiper.prototype.getCommands = function(optCommand) {
     return this._commandDetail(optCommand);
   }
   let output = 'Commands:\n' + Object.keys(commands).filter(cmd => !commands[cmd].isAlias).join(', ') +
-    '\n\nType "help <command>" for details';
+    '\n\n"help <command>" for details';
   return output;
 };
 
@@ -348,7 +347,7 @@ Swiper.prototype._commandDetail = function(cmd) {
     if (cmdInfo.arg === '<content>') {
       return out + `Where <content> is of the form:\n` +
         `    (movie/tv) <title> (<year>) (season <num>) (episode <num>)\n` +
-        `Examples:\n` +
+        `Ex:\n` +
         `    game of thrones\n` +
         `    tv game of thrones season 2\n` +
         `    game of thrones 2011 s02e05\n`;
@@ -429,7 +428,7 @@ Swiper.prototype._cancelDownload = function(video) {
 Swiper.prototype.search = function(input) {
   return Promise.try(() => isOnline()).then(online => {
     if (!online) {
-      return `I can't connect right now, try again in a minute`;
+      return `I can't connect, try again in a minute`;
     } else {
       return this._identifyContentFromInput(input)
       .then(content => {
@@ -450,9 +449,7 @@ Swiper.prototype._searchVideo = function(video) {
     if (torrents.length > 0) {
       return this._showTorrents(video, torrents);
     } else {
-      return this.awaitResponse(`I didn't find anything...try again?\n` +
-        `Or type "monitor" and I'll keep an eye out for ${video.getDesc()}`,
-        [resp.monitor, resp.yes, resp.no])
+      return this.awaitResponse(`No hits, try again?`, [resp.monitor, resp.yes, resp.no])
       .then(feedback => {
         if (feedback.match === 'yes') {
           return this._searchVideo(video);
