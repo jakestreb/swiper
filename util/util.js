@@ -138,7 +138,7 @@ function universalTorrentSearch(video, optRetryCount) {
       }
       return [];
     } else {
-      return results.filter(res => res.title && res.magnet).slice(0, 20).map(result =>
+      return results.filter(res => res && res.title && res.magnet).slice(0, 20).map(result =>
         new Torrent(video, {
           name: result.title,
           size: result.size,

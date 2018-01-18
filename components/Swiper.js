@@ -283,8 +283,8 @@ Swiper.prototype._startDownload = function(video, noPrompt) {
   // Remove the video from monitoring and queueing, if it was in those places.
   if (!noPrompt) {
     this.send(`Downloading ${video.torrent.getName()}\n\n` +
-      `status - view progress\n` +
-      `abort  - cancel all downloads`);
+      `status to view progress\n` +
+      `abort to cancel all downloads`);
   }
   this._removeContent(video, true, true);
   this.downloading.push(video);
