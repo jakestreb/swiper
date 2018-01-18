@@ -24,6 +24,7 @@
     "rimraf": "^2.6.1",
     "signal-exit": "^3.0.2",
     "thepiratebay": "^1.4.5",
+    "torrent-search-api": "^1.0.25",
     "underscore": "^1.8.3",
     "webtorrent": "^0.98.8"
   },

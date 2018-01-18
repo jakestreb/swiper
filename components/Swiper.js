@@ -250,7 +250,7 @@ Swiper.prototype.queueDownload = function(content, noPrompt) {
 // Sets the torrent for a video and downloads it.
 Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
   noPrompt ? null : this.send(`Looking for ${video.getTitle()} downloads...`);
-  return util.torrentSearch(video, 3)
+  return util.universalTorrentSearch(video, 3)
   .then(torrents => {
     let best = this._autoPickTorrent(torrents, video.getType());
     if (torrents.length === 0) {
@@ -444,7 +444,7 @@ Swiper.prototype.search = function(input) {
 };
 
 Swiper.prototype._searchVideo = function(video) {
-  return util.torrentSearch(video, 3)
+  return util.universalTorrentSearch(video, 3)
   .then(torrents => {
     if (torrents.length > 0) {
       return this._showTorrents(video, torrents);

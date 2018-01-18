@@ -1,7 +1,8 @@
 'use strict';
 
 const Promise = require('bluebird');
-const PirateBay = require('thepiratebay');
+// const PirateBay = require('thepiratebay');
+const TorrentSearchApi = require('torrent-search-api');
 const fs = require('fs');
 const path = require('path');
 const rimraf = require('rimraf');
@@ -10,6 +11,10 @@ const mkdir = Promise.promisify(fs.mkdir);
 const rimrafAsync = Promise.promisify(rimraf);
 const omdb = require('omdb');
 const TVDB = require('node-tvdb');
+
+const torrentSearch = new TorrentSearchApi();
+
+torrentSearch.enablePublicProviders();
 
 const OMDB_ID = '399c42a2';
 const TVDB_ID = '4B4DF40E7F46F41F';
@@ -94,34 +99,59 @@ function _getEpisodeDate(tvdbSeries, tvdbEpisode) {
     new Date(`${tvdbEpisode.firstAired} ${tvdbSeries.airsTime}`) : null;
 }
 
-function torrentSearch(video, optRetryCount) {
-  return PirateBay.search(video.getSearchTerm(), {
-    category: 'video',
-    page: 0,
-    orderBy: 'seeds',
-    sortBy: 'desc'
-  })
+// function torrentSearch(video, optRetryCount) {
+//   return PirateBay.search(video.getSearchTerm(), {
+//     category: 'video',
+//     page: 0,
+//     orderBy: 'seeds',
+//     sortBy: 'desc'
+//   })
+//   .then(results => {
+//     if (results.length === 0) {
+//       if (optRetryCount > 0) {
+//         return Promise.delay(100).then(() => torrentSearch(video, optRetryCount - 1));
+//       }
+//       return [];
+//     } else {
+//       return results.map(result =>
+//         new Torrent(video, {
+//           name: result.name,
+//           size: result.size,
+//           seeders: result.seeders,
+//           leechers: result.leechers,
+//           uploadTime: result.uploadDate,
+//           magnetLink: result.magnetLink
+//         })
+//       );
+//     }
+//   });
+// }
+// exports.torrentSearch = torrentSearch;
+
+function universalTorrentSearch(video, optRetryCount) {
+  return torrentSearch.search(video.getSearchTerm())
   .then(results => {
+    // console.log(results);
     if (results.length === 0) {
       if (optRetryCount > 0) {
-        return Promise.delay(100).then(() => torrentSearch(video, optRetryCount - 1));
+        return Promise.delay(100).then(() => universalTorrentSearch(video, optRetryCount - 1));
       }
       return [];
     } else {
-      return results.map(result =>
+      return results.filter(res => res.title && res.magnet).slice(0, 20).map(result =>
         new Torrent(video, {
-          name: result.name,
+          name: result.title,
           size: result.size,
-          seeders: result.seeders,
-          leechers: result.leechers,
-          uploadTime: result.uploadDate,
-          magnetLink: result.magnetLink
+          seeders: result.seeds,
+          leechers: result.peers,
+          uploadTime: result.time,
+          magnetLink: result.magnet
         })
       );
     }
   });
 }
-exports.torrentSearch = torrentSearch;
+exports.universalTorrentSearch = universalTorrentSearch;
 
 // Save a video in the correct directory, adding any necessary directories.
 function exportVideo(video) {
