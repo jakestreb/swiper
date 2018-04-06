@@ -1,5 +1,6 @@
 var common = require('./common')
 var Peer = require('../')
+var bowser = require('bowser')
 var test = require('tape')
 
 var config
@@ -36,7 +37,8 @@ test('signal event gets emitted', function (t) {
   var peer = new Peer({ config: config, initiator: true, wrtc: common.wrtc })
   peer.once('signal', function () {
     t.pass('got signal event')
-    peer.destroy(function () { t.pass('peer destroyed') })
+    peer.on('close', function () { t.pass('peer destroyed') })
+    peer.destroy()
   })
 })
 
@@ -91,8 +93,10 @@ test('data send/receive text', function (t) {
         t.ok(Buffer.isBuffer(data), 'data is Buffer')
         t.equal(data.toString(), 'sup peer1', 'got correct message')
 
-        peer1.destroy(function () { t.pass('peer1 destroyed') })
-        peer2.destroy(function () { t.pass('peer2 destroyed') })
+        peer1.on('close', function () { t.pass('peer1 destroyed') })
+        peer1.destroy()
+        peer2.on('close', function () { t.pass('peer2 destroyed') })
+        peer2.destroy()
       })
     })
   }
@@ -107,8 +111,10 @@ test('sdpTransform function is called', function (t) {
   function sdpTransform (sdp) {
     t.equal(typeof sdp, 'string', 'got a string as SDP')
     setTimeout(function () {
-      peer1.destroy(function () { t.pass('peer1 destroyed') })
-      peer2.destroy(function () { t.pass('peer2 destroyed') })
+      peer1.on('close', function () { t.pass('peer1 destroyed') })
+      peer1.destroy()
+      peer2.on('close', function () { t.pass('peer2 destroyed') })
+      peer2.destroy()
     }, 0)
     return sdp
   }
@@ -145,8 +151,10 @@ test('old constraint formats are used', function (t) {
 
   peer1.on('connect', function () {
     t.pass('peers connected')
-    peer1.destroy(function () { t.pass('peer1 destroyed') })
-    peer2.destroy(function () { t.pass('peer2 destroyed') })
+    peer1.on('close', function () { t.pass('peer1 destroyed') })
+    peer1.destroy()
+    peer2.on('close', function () { t.pass('peer2 destroyed') })
+    peer2.destroy()
   })
 })
 
@@ -171,7 +179,47 @@ test('new constraint formats are used', function (t) {
 
   peer1.on('connect', function () {
     t.pass('peers connected')
-    peer1.destroy(function () { t.pass('peer1 destroyed') })
-    peer2.destroy(function () { t.pass('peer2 destroyed') })
+    peer1.on('close', function () { t.pass('peer1 destroyed') })
+    peer1.destroy()
+    peer2.on('close', function () { t.pass('peer2 destroyed') })
+    peer2.destroy()
+  })
+})
+
+test('ensure remote address and port are available right after connection', function (t) {
+  if (bowser.safari || bowser.ios) {
+    t.pass('Skip on Safari and iOS which do not support modern getStats() calls')
+    t.end()
+    return
+  }
+
+  t.plan(7)
+
+  var peer1 = new Peer({ config: config, initiator: true, wrtc: common.wrtc })
+  var peer2 = new Peer({ config: config, wrtc: common.wrtc })
+
+  peer1.on('signal', function (data) {
+    peer2.signal(data)
+  })
+
+  peer2.on('signal', function (data) {
+    peer1.signal(data)
+  })
+
+  peer1.on('connect', function () {
+    t.pass('peers connected')
+
+    t.ok(peer1.remoteAddress, 'peer1 remote address is present')
+    t.ok(peer1.remotePort, 'peer1 remote port is present')
+
+    peer2.on('connect', function () {
+      t.ok(peer2.remoteAddress, 'peer2 remote address is present')
+      t.ok(peer2.remotePort, 'peer2 remote port is present')
+
+      peer1.on('close', function () { t.pass('peer1 destroyed') })
+      peer1.destroy()
+      peer2.on('close', function () { t.pass('peer2 destroyed') })
+      peer2.destroy()
+    })
   })
 })
