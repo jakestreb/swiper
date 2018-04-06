@@ -9,12 +9,13 @@ const rimraf = require('rimraf');
 const access = Promise.promisify(fs.access);
 const mkdir = Promise.promisify(fs.mkdir);
 const rimrafAsync = Promise.promisify(rimraf);
-const omdb = require('omdb');
+const rp = require("request-promise");
 const TVDB = require('node-tvdb');
 
 const torrentSearch = new TorrentSearchApi();
 
-torrentSearch.enablePublicProviders();
+torrentSearch.enableProvider('ThePirateBay');
+torrentSearch.enableProvider('Rarbg');
 
 const OMDB_ID = '399c42a2';
 const TVDB_ID = '4B4DF40E7F46F41F';
@@ -24,7 +25,6 @@ var tvdb = new TVDB(TVDB_ID);
 // API Key from: http://thetvdb.com/index.php?tab=apiregister
 // Username: rearmostdrip
 // Password: superman123
-Promise.promisifyAll(omdb);
 
 const Movie = require('../components/Movie.js');
 const Episode = require('../components/Episode.js');
@@ -38,35 +38,35 @@ function identifyContent(swiperId, options) {
   let season = options.season ? parseInt(options.season, 10) : null;
   let episode = options.episode ? parseInt(options.episode, 10) : null;
   // NOTE: OMDB is customized to work with apikeys.
-  return omdb.getAsync({
-    title: options.title,
-    year: options.year,
-    type: options.type,
-    apikey: OMDB_ID
+  return rp({
+    uri: `http://www.omdbapi.com/?apikey=${OMDB_ID}&t=${options.title}&y=${options.year}` +
+      `&type=${options.type}`,
+    method: 'GET'
   })
   .catch(err => {
     console.log('OMDB err:', err);
     throw new Error("I can't access the Open Movie Database, try again in a minute");
   })
-  .then(omdbEntry => {
+  .then(omdbStr => {
+    const omdbEntry = JSON.parse(omdbStr);
     if (!omdbEntry) {
       throw new Error("I don't know what that is, try being very explicit with spelling");
-    } else if (omdbEntry.type === 'movie') {
+    } else if (omdbEntry.Type === 'movie') {
       // Movie
-      return new Movie(swiperId, omdbEntry.title, omdbEntry.year);
+      return new Movie(swiperId, omdbEntry.Title, omdbEntry.Year);
     } else {
-      return _searchTVDB(omdbEntry.imdb.id)
+      return _searchTVDB(omdbEntry.imdbID)
       .then(resp => {
         if (season && episode) {
           let ep = resp.episodes.find(ep => ep.airedSeason === season &&
             ep.airedEpisodeNumber === episode);
-          return new Episode(swiperId, omdbEntry.title, ep.airedSeason, ep.airedEpisodeNumber,
+          return new Episode(swiperId, omdbEntry.Title, ep.airedSeason, ep.airedEpisodeNumber,
             _getEpisodeDate(resp, ep));
         } else {
           let eps = resp.episodes.filter(ep => !season || ep.airedSeason === season)
-            .map(ep => new Episode(swiperId, omdbEntry.title, ep.airedSeason, ep.airedEpisodeNumber,
+            .map(ep => new Episode(swiperId, omdbEntry.Title, ep.airedSeason, ep.airedEpisodeNumber,
               _getEpisodeDate(resp, ep)));
-          return new Collection(swiperId, omdbEntry.title, eps,
+          return new Collection(swiperId, omdbEntry.Title, eps,
             season ? 'season' : 'series', season);
         }
       })
@@ -131,7 +131,6 @@ function _getEpisodeDate(tvdbSeries, tvdbEpisode) {
 function universalTorrentSearch(video, optRetryCount) {
   return torrentSearch.search(video.getSearchTerm())
   .then(results => {
-    // console.log(results);
     if (results.length === 0) {
       if (optRetryCount > 0) {
         return Promise.delay(100).then(() => universalTorrentSearch(video, optRetryCount - 1));
