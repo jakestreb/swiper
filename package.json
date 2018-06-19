@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "download helper",
   "scripts": {
-    "start": "node server.js",
+    "start": "node forever.js",
     "test-server": "node test-server.js"
   },
   "author": "jake",
@@ -14,6 +14,7 @@
     "body-parser": "^1.17.2",
     "dotenv": "^4.0.0",
     "express": "^4.15.3",
+    "forever-monitor": "^1.7.1",
     "is-online": "^6.1.0",
     "lockfile": "^1.0.3",
     "node-tvdb": "^3.1.1",

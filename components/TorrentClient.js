@@ -22,10 +22,13 @@ TorrentClient.prototype.startClient = function() {
 };
 
 TorrentClient.prototype.download = function(torrent) {
+  var hd = new memwatch.HeapDiff();
   return new Promise((resolve, reject) => {
     this.client.add(torrent.getMagnet(), { path: downloadDir }, tfile => {
       torrent.setProgressFile(tfile);
       tfile.once('done', () => {
+        var diff = hd.end();
+        console.warn('After download', diff);
         resolve(torrent);
       });
       tfile.once('error', () => {
