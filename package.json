@@ -29,8 +29,7 @@
     "webtorrent": "^0.98.8"
   },
   "devDependencies": {
-    "eslint": "^3.1.1",
-    "memwatch-next": "^0.3.0"
+    "eslint": "^3.1.1"
   },
   "main": "server.js",
   "repository": {
