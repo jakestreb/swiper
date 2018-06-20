@@ -1,6 +1,7 @@
 'use strict';
 
 const WebTorrent = require('webtorrent');
+const memwatch = require('memwatch-next');
 const path = require('path');
 
 const downloadDir = process.env.DOWNLOAD_ROOT || path.resolve(__dirname, '../downloads');
