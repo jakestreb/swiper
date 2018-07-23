@@ -15,7 +15,7 @@ const TVDB = require('node-tvdb');
 const torrentSearch = new TorrentSearchApi();
 
 torrentSearch.enableProvider('ThePirateBay');
-torrentSearch.enableProvider('Rarbg');
+// torrentSearch.enableProvider('Rarbg');
 
 const OMDB_ID = '399c42a2';
 const TVDB_ID = '4B4DF40E7F46F41F';

@@ -472,9 +472,6 @@ Swiper.prototype._identifyContentFromInput = function(input) {
     throw new InputError("I don't understand what the title is");
   }
   return util.identifyContent(this.id, videoData)
-  .then(content => {
-    return content;
-  })
   .catch(err => {
     // Rethrow identifyContent errors as input errors.
     throw new InputError(err.message);

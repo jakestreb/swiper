@@ -37,7 +37,11 @@ Video.prototype.isVideo = function() {
 
 // Indicates whether the video contains any of content.
 Video.prototype.containsAny = function(content) {
-  return content.getType() === this.getType() && this.equals(content);
+  if (content.getType() === 'collection') {
+    return content.containsAny(this);
+  } else {
+    return this.containsAll(content);
+  }
 };
 
 // Indicates whether the video contains all of content.

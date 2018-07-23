@@ -7,6 +7,7 @@ const rimraf = require("rimraf");
 const rimrafAsync = Promise.promisify(rimraf);
 const express = require("express");
 const bodyParser = require("body-parser");
+const readline = require('readline');
 
 const app = express();
 
@@ -15,6 +16,7 @@ const Dispatcher = require('./components/Dispatcher.js');
 const gatewayUrl = 'https://limitless-island-56260.herokuapp.com';
 const port = process.env.PORT || 8250;
 const maxLength = 640;
+const terminal = readline.createInterface(process.stdin, process.stdout);
 
 // Delete everything in downloads folder.
 rimrafAsync('./downloads/*').then(err => {
@@ -116,10 +118,14 @@ let dispatcher = new Dispatcher({
   telegram: (msg, id) => { sendEndpointMessage(id, msg, 'telegram'); },
 });
 
-// Initialize command line Swiper.
-process.stdin.resume();
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', text => {
+terminal.prompt();
+
+terminal.on('line', (line) => {
   // Resolve with the text minus /r/n
-  dispatcher.acceptMessage('cli', 'cli', text.trim());
+  dispatcher.acceptMessage('cli', 'cli', line.trim());
+  terminal.prompt();
+});
+
+terminal.on('close', () => {
+  process.exit(0);
 });
