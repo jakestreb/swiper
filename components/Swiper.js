@@ -2,7 +2,6 @@
 
 const _ = require('underscore');
 const Promise = require('bluebird');
-const isOnline = require('is-online');
 const InputError = require('./InputError.js');
 const AbortError = require('./AbortError.js');
 const resp = require('../util/responses.js');
@@ -194,15 +193,9 @@ Swiper.prototype.check = function() {
 };
 
 Swiper.prototype.download = function(input) {
-  return isOnline().then(online => {
-    if (!online) {
-      return `I can't connect right now, try again in a minute`;
-    } else {
-      return this._identifyContentFromInput(input)
-      .then(content => {
-        return this.queueDownload(content);
-      });
-    }
+  return this._identifyContentFromInput(input)
+  .then(content => {
+    return this.queueDownload(content);
   });
 };
 
@@ -426,19 +419,13 @@ Swiper.prototype._cancelDownload = function(video) {
 };
 
 Swiper.prototype.search = function(input) {
-  return Promise.try(() => isOnline()).then(online => {
-    if (!online) {
-      return `I can't connect, try again in a minute`;
+  return this._identifyContentFromInput(input)
+  .then(content => {
+    if (content.isVideo()) {
+      return this._searchVideo(content);
     } else {
-      return this._identifyContentFromInput(input)
-      .then(content => {
-        if (content.isVideo()) {
-          return this._searchVideo(content);
-        } else {
-          return this._resolveSearchToEpisode(content)
-          .then(video => this._searchVideo(video));
-        }
-      });
+      return this._resolveSearchToEpisode(content)
+      .then(video => this._searchVideo(video));
     }
   });
 };
