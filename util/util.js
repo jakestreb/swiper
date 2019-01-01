@@ -20,7 +20,7 @@ torrentSearch.enableProvider('Rarbg');
 // torrentSearch.enableProvider('1337x');
 // torrentSearch.enableProvider('ExtraTorrent');
 
-const OMDB_ID = '399c42a2';
+const OMDB_ID = 'd4914d87';
 const TVDB_ID = '4B4DF40E7F46F41F';
 
 var tvdb = new TVDB(TVDB_ID);
