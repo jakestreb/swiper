@@ -542,12 +542,13 @@ Swiper.prototype._parseTitle = function(titleStr) {
     // Assume it's a series if season or episode is given.
     type = 'series';
   }
+  const escapedTitle = title.replace(/\&/g, '\\&');
   return {
-    title: title,
-    type: type,
-    year: year,
-    season: season,
-    episode: episode
+    title: escapedTitle,
+    type,
+    year,
+    season,
+    episode
   };
 };
 
