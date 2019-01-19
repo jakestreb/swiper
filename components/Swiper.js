@@ -258,7 +258,15 @@ Swiper.prototype._resolveVideoDownload = function(video, noPrompt) {
         return "Ok";
       });
     } else if (!best) {
-      // If no best was found automatically (and a prompt is allowed), show the torrents.
+      // If no best was found automatically (and a prompt is allowed), show the torrents sorted by
+      // seeders/leechers.
+      torrents.sort((a, b) => {
+        const aSeed = a.seeders || 0;
+        const bSeed = b.seeders || 0;
+        const aLeech = a.leechers || 0;
+        const bLeech = b.leechers || 0;
+        return aSeed === bSeed ? bLeech - aLeech : bSeed - aSeed;
+      });
       return noPrompt ? false : this._showTorrents(video, torrents);
     } else {
       video.setTorrent(best);

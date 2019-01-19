@@ -115,7 +115,7 @@ Torrent.prototype.getDownloadInfo = function() {
 
 Torrent.prototype.toString = function() {
   return `${this.name.replace(/\./g, ' ')} (${this.size}MB)\n` +
-    `${this.seeders} seed | ${this.leechers} leech | ${this.uploadTime}\n\n`;
+    `${this.seeders || '???'} seed | ${this.leechers || '???'} leech | ${this.uploadTime}\n\n`;
 };
 
 // Expects a string which starts with a decimal number and either GiB, MiB, or kiB

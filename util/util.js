@@ -16,9 +16,9 @@ const torrentSearch = new TorrentSearchApi();
 
 // torrentSearch.enableProvider('ThePirateBay');
 torrentSearch.enableProvider('Rarbg');
-// torrentSearch.enableProvider('Torrentz2');
-// torrentSearch.enableProvider('1337x');
-// torrentSearch.enableProvider('ExtraTorrent');
+torrentSearch.enableProvider('Torrentz2');
+torrentSearch.enableProvider('1337x');
+torrentSearch.enableProvider('ExtraTorrent');
 
 const OMDB_ID = 'd4914d87';
 const TVDB_ID = '4B4DF40E7F46F41F';

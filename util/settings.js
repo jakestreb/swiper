@@ -21,7 +21,7 @@ module.exports = {
   },
   // Low seeder tier to determine download pick quality. Things with fewer seeders than this
   // will still be downloaded, but as a last priority.
-  minSeeders: 30,
+  minSeeders: 10,
   monitorAt: 2, // 0-23, hour at which monitored should be searched for all items.
   // Minutes in each repeat interval after release. Stops retrying when the end of the array is
   // reached. When Swiper is started up, search begins starting in the correct place.
